@@ -68,7 +68,7 @@ b32 init(Font *font, String file_name, r32 height, s32 atlas_size, Allocator all
         load_glyph(font, i);
     }
 
-    return false;
+    return true;
 }
 
 void destroy(Font *font) {

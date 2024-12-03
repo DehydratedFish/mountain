@@ -14,7 +14,9 @@ s32 application_main(Array<String> args) {
     (void)args;
 
     Font font = {};
-    init(&font, t_format("fonts/%s", "LiberationSans-Regular.ttf"), 20.0f, 2048);
+    if (!init(&font, t_format("fonts/%s", "LiberationSans-Regular.ttf"), 20.0f, 2048)) {
+        return -1;
+    }
     DEFER(destroy(&font));
 
     GlyphInfo glyph = get_glyph(&font, 'a');
