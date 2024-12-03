@@ -81,14 +81,13 @@ void destroy(Font *font) {
 
 INTERNAL void copy_image(String atlas, s32 stride, s32 x, s32 y, u8 *bitmap, s32 width, s32 height) {
     u8 *dest = &atlas[y * stride + x];
+
     for (s32 h = 0; h < height; h += 1) {
         for (s32 w = 0; w < width; w += 1) {
-            *dest = *bitmap;
-
-            dest   += 1;
-            bitmap += 1;
+            dest[w] = bitmap[w];
         }
-        dest += stride;
+        bitmap += width;
+        dest   += stride;
     }
 }
 
