@@ -5,6 +5,7 @@
 #include "arena.h"
 #include "list.h"
 #include "string2.h"
+#include "string_builder.h"
 #include "utf.h"
 
 #include <cwchar>
@@ -93,7 +94,7 @@ INTERNAL s64 QPCFrequency;
 INTERNAL int main_main() {
     // IMPORTANT: Set the allocators as soon as possible.
     DefaultAllocator = CStdAllocator;
-    init_arena(&TempStorage, KILOBYTES(32));
+    init(&TempStorage, KILOBYTES(32));
     TempAllocator = make_arena_allocator(&TempStorage);
 
     ProcessHandle = GetCurrentProcess();
@@ -564,6 +565,80 @@ void platform_change_title(PlatformWindow *window, String title) {
 void platform_swap_buffers(PlatformWindow *window) {
     SwapBuffers(window->dc);
 }
+
+
+PlatformExecutionContext platform_execute(String command) {
+    SCOPE_TEMP_STORAGE;
+
+    PlatformExecutionContext context = {};
+
+    WideString wide_command = widen(command);
+
+    void *read_pipe  = 0;
+    void *write_pipe = 0;
+
+    SECURITY_ATTRIBUTES attributes = {};
+    attributes.length              = sizeof(attributes);
+    attributes.inherit_handle      = true;
+    attributes.security_descriptor = 0;
+
+    if(!CreatePipe(&read_pipe, &write_pipe, &attributes, 0)) {
+        context.error = true;
+        return context;
+    }
+    if(!SetHandleInformation(read_pipe, HANDLE_FLAG_INHERIT, 0)) {
+        context.error = true;
+        return context;
+    }
+
+    PROCESS_INFORMATION process = {};
+    STARTUPINFOW info = {};
+    info.cb         = sizeof(info);
+    info.std_error  = write_pipe;
+    info.std_output = write_pipe;
+    info.flags     |= STARTF_USESTDHANDLES;
+
+    info.cb = sizeof(info);
+    b32 status = CreateProcessW(0, (wchar_t*)wide_command.data, 0, 0, true, 0, 0, 0, &info, &process);
+    if (!status) {
+        log_error("ERROR: Running command %S with error code %d. ", command, GetLastError());
+        context.error = true;
+        return context;
+    }
+
+    // NOTE: closing the write pipe because otherwise the handle will linger after the process finished
+    //       and the last ReadFile will never return as the write handle stays open
+    CloseHandle(write_pipe);
+
+    StringBuilder builder = {};
+    DEFER(destroy(&builder));
+
+    s32 const buffer_size = 4096;
+    u8 buffer[buffer_size];
+    u32 bytes_read = 0;
+
+    b32 read_ok = true;
+    while (read_ok) {
+        read_ok = ReadFile(read_pipe, buffer, buffer_size, &bytes_read, 0);
+        append(&builder, {buffer, bytes_read});
+    }
+
+    WaitForSingleObject(process.process, INFINITE);
+
+    u32 exit_code = 0;
+    GetExitCodeProcess(process.process, &exit_code);
+    CloseHandle(process.process);
+    CloseHandle(process.thread);
+    
+    CloseHandle(read_pipe);
+
+    context.output    = to_allocated_string(&builder);
+    context.exit_code = exit_code;
+
+    return context;
+}
+
+
 
 
 INTERNAL u32 process_scan_code(sPtr l_param) {

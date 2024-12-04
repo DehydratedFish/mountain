@@ -94,6 +94,14 @@ struct PlatformUpdateInfo {
 };
 void platform_window_updates(PlatformWindow *window, PlatformUpdateInfo *info, u32 flags);
 
+struct PlatformExecutionContext {
+    b32    error;
+    String output;
+    s32    exit_code;
+};
+
+PlatformExecutionContext platform_execute(String command);
+
 
 s32 application_main(Array<String> args);
 

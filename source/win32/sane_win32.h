@@ -280,6 +280,49 @@ u32 const ERROR_ALREADY_EXISTS = 0xB7;
 WIN32_FUNC_DEF(b32) CreateDirectoryW(wchar_t *path_name, SECURITY_ATTRIBUTES *security_attributes);
 WIN32_FUNC_DEF(b32) PathFileExistsW(wchar_t *path);
 
+WIN32_FUNC_DEF(b32) CreatePipe(void **read_pipe, void **write_pipe, SECURITY_ATTRIBUTES *pipe_attributes, u32 size);
+
+u32 const HANDLE_FLAG_INHERIT = 0x00000001;
+WIN32_FUNC_DEF(b32) SetHandleInformation(void *object, u32 mask, u32 flags);
+
+struct PROCESS_INFORMATION {
+  void *process;
+  void *thread;
+  u32   process_id;
+  u32   thread_id;
+};
+
+u32 const STARTF_USESTDHANDLES = 0x00000100;
+struct STARTUPINFOW {
+  u32   cb;
+  wchar_t *reserved;
+  wchar_t *desktop;
+  wchar_t *title;
+  u32   x;
+  u32   y;
+  u32   x_size;
+  u32   y_size;
+  u32   x_count_chars;
+  u32   y_count_chars;
+  u32   fill_attribute;
+  u32   flags;
+  u16   show_window;
+  u16   cb_reserved2;
+  u8   *lp_reserved2;
+  void *std_input;
+  void *std_output;
+  void *std_error;
+};
+
+WIN32_FUNC_DEF(b32) CreateProcessW(wchar_t const *application_name, wchar_t const *command_line,
+                                   SECURITY_ATTRIBUTES *process_attributes, SECURITY_ATTRIBUTES *thread_attributes,
+                                   b32 inherit_handles, u32 creation_flags, void *environment,
+                                   wchar_t const *current_directory, STARTUPINFOW *startup_info,
+                                   PROCESS_INFORMATION *process_information);
+
+WIN32_FUNC_DEF(b32) GetExitCodeProcess(void *process, u32 *exit_code);
+
+
 struct FILETIME {
     u32 low_date_time;
     u32 high_date_time;

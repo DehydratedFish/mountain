@@ -18,7 +18,7 @@ inline void destroy(MemoryArena *arena) {
     arena->alloc  = 0;
 }
 
-inline void init_arena(MemoryArena *arena, s64 size, Allocator alloc = DefaultAllocator) {
+inline void init(MemoryArena *arena, s64 size, Allocator alloc = DefaultAllocator) {
     if (arena->allocator.allocate != alloc.allocate) {
         destroy(arena);
         arena->allocator = alloc;
