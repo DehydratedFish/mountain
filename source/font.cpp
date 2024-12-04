@@ -124,7 +124,7 @@ INTERNAL CachedGlyph *load_glyph(Font *font, u32 cp) {
         info.height  = h;
         info.bearing_x = x_offset;
         info.bearing_y = y_offset;
-        info.advance   = advance_width * font->scale;
+        info.advance   = (s16)(advance_width * font->scale);
         info.table_index = font->cache_used;
 
         result = insert(&font->glyphs, cp, info);
