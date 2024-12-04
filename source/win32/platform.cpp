@@ -262,6 +262,47 @@ b32 platform_flush_write_buffer(PlatformFile *file) {
     return true;
 }
 
+
+b32 platform_create_folder(String name) {
+    SCOPE_TEMP_STORAGE;
+    WideString wide_name = widen(name);
+
+    b32 result = CreateDirectoryW(wide_name.data, 0);
+    if (GetLastError() == ERROR_ALREADY_EXISTS) result = true; 
+
+    return result;
+}
+
+INTERNAL String path_element(String path) {
+    String result = {};
+    result.data = path.data;
+
+    for (s64 i = 0; i < path.size; i += 1) {
+        if (path[i] == '/' || path[i] == '\\') {
+            if (path.size == 0) continue;
+
+            break;
+        }
+        result.size += 1;
+    }
+
+    return result;
+}
+
+void platform_create_all_folders(String names) {
+    SCOPE_TEMP_STORAGE;
+
+    // TODO: Paths starting with / should be absolut.
+    String folder = path_element(names);
+    while (folder.size) {
+        platform_create_folder(folder);
+
+        shrink_front(names, folder.size += 1);
+    }
+}
+
+
+
 PlatformReadResult platform_read_entire_file(String file, Allocator alloc) {
     PlatformReadResult result = {};
 

@@ -34,6 +34,10 @@ s64    platform_write(PlatformFile *file, u64 offset, void const *buffer, s64 si
 b32    platform_flush_write_buffer(PlatformFile *file);
 
 
+b32  platform_create_folder(String name);
+void platform_create_all_folders(String names);
+
+
 struct PlatformTerminal {
     PlatformFile *out;
 };
@@ -43,7 +47,7 @@ extern PlatformTerminal Console;
 
 enum {
     PLATFORM_READ_OK,
-    PLATFORM_READ_ERROR = 0x01
+    PLATFORM_READ_ERROR = 0x01,
 };
 struct PlatformReadResult {
     String content;

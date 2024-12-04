@@ -276,6 +276,8 @@ u32 const FILE_CURRENT = 1;
 u32 const FILE_END     = 2;
 WIN32_FUNC_DEF(u32) SetFilePointer(void *file, s32 distance_to_move, s32 *distance_to_move_high, u32 move_method);
 
+u32 const ERROR_ALREADY_EXISTS = 0xB7;
+WIN32_FUNC_DEF(b32) CreateDirectoryW(wchar_t *path_name, SECURITY_ATTRIBUTES *security_attributes);
 WIN32_FUNC_DEF(b32) PathFileExistsW(wchar_t *path);
 
 struct FILETIME {
