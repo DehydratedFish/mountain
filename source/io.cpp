@@ -2,7 +2,7 @@
 
 #include <cstdarg>
 
-#include "string2.h"
+#include "string_builder.h"
 #include "platform.h"
 
 

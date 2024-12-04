@@ -1,6 +1,6 @@
 #include "utf.h"
 #include "memory.h"
-#include "string2.h"
+#include "string_builder.h"
 #include "list.h"
         
 
