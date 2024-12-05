@@ -103,6 +103,8 @@ struct PlatformExecutionContext {
 PlatformExecutionContext platform_execute(String command);
 
 
+String platform_config_folder(Allocator alloc = TempAllocator);
+
 s32 application_main(Array<String> args);
 
 

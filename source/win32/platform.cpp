@@ -639,6 +639,19 @@ PlatformExecutionContext platform_execute(String command) {
 }
 
 
+String platform_config_folder(Allocator alloc) {
+    wchar_t *buffer;
+    if (SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, 0, &buffer) != S_OK) return {};
+
+    String16 path = {(u16*)buffer, (s64)wcslen(buffer)};
+    convert_backslash_to_slash(buffer, path.size);
+    
+    String result = to_utf8(alloc, path);
+    CoTaskMemFree(buffer);
+
+    return result;
+}
+
 
 
 INTERNAL u32 process_scan_code(sPtr l_param) {

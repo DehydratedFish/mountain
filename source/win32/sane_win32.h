@@ -82,6 +82,9 @@ u32 const VK_RIGHT   = 0x27;
 u32 const VK_DOWN    = 0x28;
 u32 const VK_DELETE  = 0x2E;
 
+
+u32 const S_OK = 0x00000000;
+
 #define LOWORD(v) ((u32)((v) & 0xFFFF))
 #define HIWORD(v) ((u32)(((v) >> 16) & 0xFFFF))
 
@@ -435,6 +438,25 @@ WIN32_FUNC_DEF(b32) SwapBuffers(HDC unnamed);
 
 WIN32_FUNC_DEF(void) DebugBreak();
 
+
+#if defined(__cplusplus)
+#define EXTERN_C extern "C"
+#else
+#define EXPERN_C extern
+#endif // defined(__cplusplus)
+
+struct GUID {
+    unsigned long  data1;
+    unsigned short data2;
+    unsigned short data3;
+    unsigned char  data4[8];
+};
+
+#include "Knownfolders.h" // This include should be ok.
+
+// TODO: This should be a pointer when compiling C.
+WIN32_FUNC_DEF(sPtr) SHGetKnownFolderPath(GUID const &id, u32 flags, void *token, wchar_t **path);
+WIN32_FUNC_DEF(void) CoTaskMemFree(void *);
 
 // TODO: SymInitialize, SymFromAddr and SymGetLineFromAddr64 should be the UNICODE W variant.
 WIN32_FUNC_DEF(b32) SymInitialize(HPROCESS process, wchar_t const *user_search_path, b32 invade_process);
