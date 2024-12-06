@@ -43,7 +43,7 @@ void reset_temp_storage();
 // Useful if you need multiple or big temporary allocations which would lead the temporary
 // storage to overflow on following code. Also it frees all allocated things at once.
 //===============================================
-#define SCOPE_TEMP_STORAGE SCOPE_TEMP_STORAGE_IMPL(CONCAT(TMP_STORAGE_REWIND_MARK, __COUNTER__))
+#define SCOPE_TEMP_STORAGE() SCOPE_TEMP_STORAGE_IMPL(CONCAT(TMP_STORAGE_REWIND_MARK, __COUNTER__))
 #define SCOPE_TEMP_STORAGE_IMPL(name) auto name = temp_storage_mark(); DEFER(temp_storage_rewind(name));
 
 

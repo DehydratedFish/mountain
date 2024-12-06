@@ -137,9 +137,43 @@ struct WideString {
 };
 
 INTERNAL WideString widen(String str, Allocator alloc = TempAllocator) {
-    String16 result = to_utf16(alloc, str, true);
+    s64 length = utf16_string_length(str) + 1;
+
+    String16 result = {};
+    result.data = ALLOC(alloc, u16, length);
+    result.size = length;
+
+    to_utf16(result, str);
+    result.data[length - 1] = L'\0';
 
     return {(wchar_t*)result.data, result.size};
+}
+
+INTERNAL void convert_slash_to_backslash(String16 str) {
+    for (s64 i = 0; i < str.size; i += 1) {
+        if (str.data[i] == L'/') str.data[i] = L'\\';
+    }
+}
+
+// NOTE: This is needed for paths to prepend \\?\ to it, else paths can only
+//       be MAX_PATH long.
+INTERNAL WideString widen_path(String str, Allocator alloc = TempAllocator) {
+    String const prefix = "\\\\?\\";
+
+    s64 length = utf16_string_length(str);
+    if (length <= 0) return {};
+
+    s64 total_size = prefix.size + length + 1;
+    u16 *data = ALLOC(alloc, u16, total_size);
+
+    String16 path = {data + prefix.size, length};
+    copy_memory(data, prefix.data, prefix.size);
+    to_utf16(path, str);
+    data[total_size - 1] = '\0';
+
+    convert_slash_to_backslash(path);
+
+    return {(wchar_t*)data, total_size};
 }
 
 
@@ -147,14 +181,6 @@ INTERNAL void convert_backslash_to_slash(wchar_t *buffer, s64 size) {
     for (s64 i = 0; i < size; i += 1) {
         if (buffer[i] == L'\\') buffer[i] = L'/';
     }
-}
-INTERNAL void convert_slash_to_backslash(wchar_t *buffer, s64 size) {
-    for (s64 i = 0; i < size; i += 1) {
-        if (buffer[i] == L'/') buffer[i] = L'\\';
-    }
-}
-INTERNAL void convert_slash_to_backslash(WideString str) {
-    return convert_slash_to_backslash(str.data, str.size);
 }
 
 INTERNAL RECT absolute_client_rect(HWND window) {
@@ -189,8 +215,7 @@ PlatformFile platform_file_open(String filename, PlatformFileOptions options) {
 
     PlatformFile result = {};
 
-    WideString wide_filename = widen(filename);
-    convert_slash_to_backslash(wide_filename);
+    WideString wide_filename = widen_path(filename);
 
     void *handle = CreateFileW(wide_filename.data, mode, 0, 0, open_mode, FILE_ATTRIBUTE_NORMAL, 0);
     if (handle == INVALID_HANDLE_VALUE) {
@@ -264,9 +289,82 @@ b32 platform_flush_write_buffer(PlatformFile *file) {
 }
 
 
+// NOTE: It would not be necessary to allocate the path so often if it would be possible
+//       to set the current working directory before the function call. But then
+//       there would be a lot of problems in multithreading.
+INTERNAL void delete_folder_content(WideString path) {
+    SCOPE_TEMP_STORAGE();
+
+    // TODO: Check for more wildcards? And maybe make this prettier...
+    WideString search = {};
+    if (path.data[path.size - 1] == '\\') {
+        search.data = ALLOC(TempAllocator, wchar_t, path.size + 1);
+        search.size = path.size + 1;
+        
+        search.data[search.size - 2] = L'*';
+        search.data[search.size - 1] = L'\0';
+    } else {
+        search.data = ALLOC(TempAllocator, wchar_t, path.size + 2);
+        search.size = path.size + 2;
+        
+        search.data[search.size - 3] = L'\\';
+        search.data[search.size - 2] = L'*';
+        search.data[search.size - 1] = L'\0';
+    }
+
+    WIN32_FIND_DATAW data = {};
+    void *handle = FindFirstFileW(search.data, &data);
+    if (handle == INVALID_HANDLE_VALUE) return;
+
+    do {
+        SCOPE_TEMP_STORAGE();
+
+        WideString item = {data.file_name, (s64)wcslen(data.file_name)};
+
+        s64 total_length = search.size + item.size;
+        WideString item_path = {};
+        item_path.data = ALLOC(TempAllocator, wchar_t, total_length);
+        item_path.size = total_length;
+
+        copy_memory(item_path.data, search.data, (search.size - 2) * sizeof(wchar_t*)); // NOTE: -2 because of the trailing *.
+        copy_memory(item_path.data + search.size - 2, item.data, item.size * sizeof(wchar_t*));
+        item_path.data[total_length - 1] = L'\0';
+
+        if (data.file_attributes & FILE_ATTRIBUTE_DIRECTORY) {
+            delete_folder_content(item_path);
+            RemoveDirectoryW(item_path.data);
+        } else {
+            DeleteFileW(item_path.data);
+        }
+    } while (FindNextFileW(handle, &data));
+
+    FindClose(handle);
+}
+
+void platform_delete_file(String path) {
+    SCOPE_TEMP_STORAGE();
+
+    WideString wide_path = widen_path(path);
+    u32 attribs = GetFileAttributesW(wide_path.data);
+
+    if (attribs & FILE_ATTRIBUTE_DIRECTORY) {
+        delete_folder_content(wide_path);
+        RemoveDirectoryW(wide_path.data);
+    } else {
+        DeleteFileW(wide_path.data);
+    }
+}
+
+void platform_delete_folder_content(String path) {
+    SCOPE_TEMP_STORAGE();
+
+    WideString wide_path = widen_path(path);
+    delete_folder_content(wide_path);
+}
+
 b32 platform_create_folder(String name) {
-    SCOPE_TEMP_STORAGE;
-    WideString wide_name = widen(name);
+    SCOPE_TEMP_STORAGE();
+    WideString wide_name = widen_path(name);
 
     b32 result = CreateDirectoryW(wide_name.data, 0);
     if (GetLastError() == ERROR_ALREADY_EXISTS) result = true; 
@@ -291,7 +389,7 @@ INTERNAL String path_element(String path) {
 }
 
 void platform_create_all_folders(String names) {
-    SCOPE_TEMP_STORAGE;
+    SCOPE_TEMP_STORAGE();
 
     // TODO: Paths starting with / should be absolut.
     String folder = path_element(names);
@@ -307,7 +405,7 @@ void platform_create_all_folders(String names) {
 PlatformReadResult platform_read_entire_file(String file, Allocator alloc) {
     PlatformReadResult result = {};
 
-    WideString wide_file = widen(file);
+    WideString wide_file = widen_path(file);
     void *handle = CreateFileW(wide_file.data, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
     if (handle == INVALID_HANDLE_VALUE) {
         result.error = PLATFORM_READ_ERROR;
@@ -346,7 +444,7 @@ PlatformReadResult platform_read_entire_file(String file, Allocator alloc) {
 
 
 b32 platform_file_exists(String file) {
-    WideString wide_file = widen(file);
+    WideString wide_file = widen_path(file);
 
     return PathFileExistsW(wide_file.data);
 }
@@ -421,7 +519,7 @@ struct PlatformDynamicLibrary {
 PlatformDynamicLibrary *platform_open_dynamic_library (String name) {
     PlatformDynamicLibrary *result = 0;
 
-    WideString wide_name = widen(name);
+    WideString wide_name = widen_path(name);
     HMODULE handle = LoadLibraryW(wide_name.data);
     if (handle) {
         result = ALLOC(DefaultAllocator, PlatformDynamicLibrary, 1);
@@ -568,10 +666,11 @@ void platform_swap_buffers(PlatformWindow *window) {
 
 
 PlatformExecutionContext platform_execute(String command) {
-    SCOPE_TEMP_STORAGE;
+    SCOPE_TEMP_STORAGE();
 
     PlatformExecutionContext context = {};
 
+    // TODO: Converting slashes to backslashes?
     WideString wide_command = widen(command);
 
     void *read_pipe  = 0;

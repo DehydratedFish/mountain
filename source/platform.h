@@ -33,7 +33,9 @@ s64    platform_write(PlatformFile *file, void const *buffer, s64 size);
 s64    platform_write(PlatformFile *file, u64 offset, void const *buffer, s64 size);
 b32    platform_flush_write_buffer(PlatformFile *file);
 
-
+// NOTE: Does also delete folders.
+void platform_delete_file(String path);
+void platform_delete_folder_content(String path);
 b32  platform_create_folder(String name);
 void platform_create_all_folders(String names);
 

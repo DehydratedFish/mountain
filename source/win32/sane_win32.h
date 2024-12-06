@@ -267,7 +267,8 @@ u32 const CREATE_ALWAYS = 2;
 u32 const OPEN_EXISTING = 3;
 u32 const OPEN_ALWAYS   = 4;
 
-u32 const FILE_ATTRIBUTE_NORMAL = 128;
+u32 const FILE_ATTRIBUTE_DIRECTORY = 0x00000010;
+u32 const FILE_ATTRIBUTE_NORMAL    = 0x00000080;
 WIN32_FUNC_DEF(void*) CreateFileW(wchar_t *file_name, u32 desired_access, u32 share_mode, SECURITY_ATTRIBUTES *security_attributes, u32 creation_disposition, u32 flags_and_attributes, void *template_file);
 
 WIN32_FUNC_DEF(b32) ReadFile(void *file, void *buffer, u32 number_of_bytes_to_read, u32 *number_of_bytes_read, OVERLAPPED *overlapped);
@@ -281,6 +282,9 @@ WIN32_FUNC_DEF(u32) SetFilePointer(void *file, s32 distance_to_move, s32 *distan
 
 u32 const ERROR_ALREADY_EXISTS = 0xB7;
 WIN32_FUNC_DEF(b32) CreateDirectoryW(wchar_t *path_name, SECURITY_ATTRIBUTES *security_attributes);
+WIN32_FUNC_DEF(b32) RemoveDirectoryW(wchar_t *file_name);
+WIN32_FUNC_DEF(b32) DeleteFileW(wchar_t *file_name);
+WIN32_FUNC_DEF(u32) GetFileAttributesW(wchar_t *file_name);
 WIN32_FUNC_DEF(b32) PathFileExistsW(wchar_t *path);
 
 WIN32_FUNC_DEF(b32) CreatePipe(void **read_pipe, void **write_pipe, SECURITY_ATTRIBUTES *pipe_attributes, u32 size);

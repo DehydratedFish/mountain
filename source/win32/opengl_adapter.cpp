@@ -209,7 +209,7 @@ void platform_opengl_delete_context(PlatformOpenGLContext *context) {
 
 
 INTERNAL void *public_function_loader(PlatformOpenGLContext *context, String name) {
-    SCOPE_TEMP_STORAGE;
+    SCOPE_TEMP_STORAGE();
     return load_gl_function(context->gl_lib, c_string_copy(name, TempAllocator));
 }
 

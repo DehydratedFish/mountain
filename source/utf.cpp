@@ -61,6 +61,71 @@ s64 utf8_string_length(String16 string) {
     return length;
 }
 
+UTFResult to_utf8(String buffer, String16 string) {
+    UTF16Info info = utf16_info(string);
+
+    s64 pos = 0;
+    while (string.size) {
+        if (info.status != UTF_OK) return info.status;
+
+        if (info.bytes == 1) {
+            if (pos + 3 >= buffer.size) return UTF_BUFFER_TOO_SHORT;
+
+            u32 cp = ((info.byte[0] - 0xD800) >> 10) + (info.byte[1] - 0xDC00) + 0x10000;
+
+            u8 byte;
+            byte = 0xF0 | (cp >> 18);
+            buffer[pos + 0] = byte;
+            byte = 0x80 | ((cp >> 12) & 0x3F);
+            buffer[pos + 1] = byte;
+            byte = 0x80 | ((cp >> 6) & 0x3F);
+            buffer[pos + 2] = byte;
+            byte = 0x80 | (cp & 0x3F);
+            buffer[pos + 3] = byte;
+
+            pos += 4;
+        } else {
+            u16 cp = info.byte[0];
+
+            u8 byte;
+            if (cp < 0x80) {
+                if (pos >= buffer.size) return UTF_BUFFER_TOO_SHORT;
+
+                byte = (u8)cp;
+                buffer[pos] = byte;
+
+                pos += 1;
+            } else if (cp < 0x800) {
+                if (pos + 1 >= buffer.size) return UTF_BUFFER_TOO_SHORT;
+
+                byte = 0xC0 | (cp >> 6);
+                buffer[pos + 0] = byte;
+                byte = 0x80 | (cp & 0x3F);
+                buffer[pos + 1] = byte;
+
+                pos += 2;
+            } else {
+                if (pos + 2 >= buffer.size) return UTF_BUFFER_TOO_SHORT;
+
+                byte = 0xE0 | (cp >> 12);
+                buffer[pos + 0] = byte;
+                byte = 0x80 | ((cp >> 6) & 0x3F);
+                buffer[pos + 1] = byte;
+                byte = 0x80 | (cp & 0x3F);
+                buffer[pos + 2] = byte;
+
+                pos += 3;
+            }
+        }
+
+        string.data += info.bytes;
+        string.size -= info.bytes;
+        info = utf16_info(string);
+    }
+
+    return info.status;
+}
+
 String to_utf8(Allocator alloc, String16 string) {
     if (string.size == 0) return {};
 
@@ -161,6 +226,7 @@ INTERNAL s32 utf8_length(String str, s64 offset) {
     return utf8_length(str[offset]);
 }
 
+// TODO: Remove.
 struct UTF8GetResult {
     u8  byte[4];
     s32 size;
@@ -209,10 +275,130 @@ INTERNAL UTF8GetResult get_utf8_backwards(String string, s64 offset) {
     return result;
 }
 
+
+UTF8Info utf8_info(u8 *string) {
+    UTF8Info result = {};
+
+    s32 length = utf8_length(string[0]);
+
+    copy_memory(result.byte, string, length);
+    result.bytes = length;
+
+    return result;
+}
+
+UTF8Info utf8_info(String string) {
+    UTF8Info result = {};
+
+    if (string.size == 0) return result;
+
+    s32 length = utf8_length(string[0]);
+    if (length > string.size) {
+        result.status = UTF_INVALID_SEQUENCE;
+        return result;
+    }
+
+    copy_memory(result.byte, string.data, length);
+    result.bytes = length;
+
+    return result;
+}
+
+UTF16Info utf16_info(u16 *string) {
+    UTF16Info result = {};
+
+    s32 length = string[0] > 0xD7FF && string[0] < 0xDC00 ? 2 : 1;
+
+    copy_memory(result.byte, string, length * sizeof(u16));
+    result.bytes = length;
+
+    return result;
+}
+
+UTF16Info utf16_info(String16 string) {
+    UTF16Info result = {};
+
+    if (string.size == 0) return result;
+
+    s32 length = string.data[0] > 0xD7FF && string.data[0] < 0xDC00 ? 2 : 1;
+    if (length > string.size) {
+        result.status = UTF_INVALID_SEQUENCE;
+        return result;
+    }
+
+    copy_memory(result.byte, string.data, length * sizeof(u16));
+    result.bytes = length;
+
+    return result;
+}
+
 /*
  * Note: Helpful stackoverflow question
  * https://stackoverflow.com/questions/73758747/looking-for-the-description-of-the-algorithm-to-convert-utf8-to-utf16
  */
+s64 utf16_string_length(String string) {
+    s64 offset = 0x00;
+    u32 status = GET_OK;
+    while (status == GET_OK) {
+        UTF8GetResult c = get_utf8(string, offset);
+        status = c.status;
+        if (c.status != GET_OK) return -1;
+
+        offset += c.size;
+    }
+
+    return offset;
+}
+
+UTFResult to_utf16(String16 buffer, String string) {
+    UTF8Info info = utf8_info(string);
+
+    s64 pos = 0;
+    while (string.size) {
+        if (info.status != UTF_OK) return info.status;
+
+        if (info.bytes == 1) {
+            if (pos >= buffer.size) return UTF_BUFFER_TOO_SHORT;
+
+            u16 value = info.byte[0] & 0x7F;
+            buffer.data[pos] = value;
+
+            pos += 1;
+        } else if (info.bytes == 2) {
+            if (pos >= buffer.size) return UTF_BUFFER_TOO_SHORT;
+
+            u16 value = ((info.byte[0] & 0x1F) << 6) | (info.byte[1] & 0x3F);
+            buffer.data[pos] = value;
+
+            pos += 1;
+        } else if (info.bytes == 3) {
+            if (pos >= buffer.size) return UTF_BUFFER_TOO_SHORT;
+
+            u16 value = ((info.byte[0] & 0x0F) << 12) | ((info.byte[1] & 0x3F) << 6) | (info.byte[2] & 0x3F);
+            buffer.data[pos] = value;
+
+            pos += 1;
+        } else if (info.bytes == 4) {
+            if (pos + 1 >= buffer.size) return UTF_BUFFER_TOO_SHORT;
+            u32 cp = ((info.byte[0] & 0x07) << 18) | ((info.byte[1] & 0x3F) << 12) | ((info.byte[2] & 0x3F) << 6) | (info.byte[3] & 0x3F);
+            cp -= 0x10000;
+
+            u16 high = 0xD800 + ((cp >> 10) & 0x3FF);
+            u16 low  = 0xDC00 + (cp & 0x3FF);
+
+            buffer.data[pos]     = high;
+            buffer.data[pos + 1] = low;
+
+            pos += 2;
+        }
+
+        shrink_front(string, info.bytes);
+        info = utf8_info(string);
+    }
+
+    return info.status;
+}
+
 String16 to_utf16(Allocator alloc, String string, b32 add_null_terminator) {
     if (string.size == 0) return {};
 
