@@ -36,9 +36,8 @@ inline void reset(StringBuilder *builder) {
     builder->total_size = 0;
 }
 
-inline void append(StringBuilder *builder, u8 c, Allocator alloc = DefaultAllocator) {
+inline void append(StringBuilder *builder, u8 c) {
     if (builder->current == 0) builder->current = &builder->first;
-    if (builder->allocator.allocate == 0) builder->allocator = alloc;
 
     if (builder->current->used + 1 > STRING_BUILDER_BLOCK_SIZE) {
         if (builder->current->next == 0) {
@@ -55,9 +54,8 @@ inline void append(StringBuilder *builder, u8 c, Allocator alloc = DefaultAlloca
     builder->total_size    += 1;
 }
 
-inline void append(StringBuilder *builder, String str, Allocator alloc = DefaultAllocator) {
+inline void append(StringBuilder *builder, String str) {
     if (builder->current == 0) builder->current = &builder->first;
-    if (builder->allocator.allocate == 0) builder->allocator = alloc;
 
     s64 space = STRING_BUILDER_BLOCK_SIZE - builder->current->used;
     while (space < str.size) {
@@ -81,9 +79,9 @@ inline void append(StringBuilder *builder, String str, Allocator alloc = Default
     builder->total_size    += str.size;
 }
 
-inline void append_raw(StringBuilder *builder, void *buffer, s64 size, Allocator alloc = DefaultAllocator) {
+inline void append_raw(StringBuilder *builder, void *buffer, s64 size) {
     String str = {(u8*)buffer, size};
-    append(builder, str, alloc);
+    append(builder, str);
 }
 
 inline void destroy(StringBuilder *builder) {
