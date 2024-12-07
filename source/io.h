@@ -45,8 +45,8 @@ enum ScanCode {
     SCAN_CODE_P = 0x19,
     SCAN_CODE_LEFT_BRACKET  = 0x1A,
     SCAN_CODE_RIGHT_BRACKET = 0x1A,
-    SCAN_CODE_RETURN = 0x1C,
-    SCAN_CODE_LEFT_CONTROL = 0x1D,
+    SCAN_CODE_RETURN        = 0x1C,
+    SCAN_CODE_LEFT_CONTROL  = 0x1D,
     SCAN_CODE_A = 0x1E,
     SCAN_CODE_S = 0x1F,
     SCAN_CODE_D = 0x20,
@@ -56,11 +56,11 @@ enum ScanCode {
     SCAN_CODE_J = 0x24,
     SCAN_CODE_K = 0x25,
     SCAN_CODE_L = 0x26,
-    SCAN_CODE_SEMICOLON = 0x27,
+    SCAN_CODE_SEMICOLON    = 0x27,
     SCAN_CODE_SINGLE_QUOTE = 0x28,
-    SCAN_CODE_GRAVE  = 0x29,
-    SCAN_CODE_LEFT_SHIFT = 0x2A,
-    SCAN_CODE_BACKSLASH = 0x2B,
+    SCAN_CODE_GRAVE        = 0x29,
+    SCAN_CODE_LEFT_SHIFT   = 0x2A,
+    SCAN_CODE_BACKSLASH    = 0x2B,
     SCAN_CODE_Z = 0x2C,
     SCAN_CODE_X = 0x2D,
     SCAN_CODE_C = 0x2E,
@@ -73,7 +73,7 @@ enum ScanCode {
     SCAN_CODE_SLASH = 0x34,
     SCAN_CODE_RIGHT_SHIFT = 0x36,
     SCAN_CODE_LEFT_ALT = 0x38,
-    SCAN_CODE_SPACE = 0x39,
+    SCAN_CODE_SPACE    = 0x39,
     SCAN_CODE_CAPSLOCK = 0x3A,
 
     SCAN_CODE_F1  = 0x3B,
@@ -251,6 +251,7 @@ s64 format(struct PlatformFile *file, char const *fmt, va_list args);
 
 String format(char const *fmt, ...);
 String t_format(char const *fmt, ...);
+String format(Allocator alloc, char const *fmt, ...);
 
 
 void change_log_file(struct PlatformFile *file);

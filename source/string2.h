@@ -3,7 +3,7 @@
 #include "memory.h"
 
 
-inline bool is_any(u8 c, String delimiters) {
+inline b32 is_any(u8 c, String delimiters) {
     for (s64 i = 0; i < delimiters.size; i += 1) {
         if (c == delimiters[i]) return true;
     }
@@ -11,7 +11,7 @@ inline bool is_any(u8 c, String delimiters) {
     return false;
 }
 
-inline bool equal(String lhs, String rhs) {
+inline b32 equal(String lhs, String rhs) {
     if (lhs.size == rhs.size) {
         for (s64 i = 0; i < lhs.size; i += 1) {
             if (lhs[i] != rhs[i]) return false;
@@ -31,7 +31,7 @@ inline u8 lower_char(u8 c) {
     return c;
 }
 
-inline bool caseless_equal(String lhs, String rhs) {
+inline b32 caseless_equal(String lhs, String rhs) {
     if (lhs.size == rhs.size) {
         for (s64 i = 0; i < lhs.size; i += 1) {
            if (lower_char(lhs[i]) != lower_char(rhs[i])) return false;
@@ -51,7 +51,7 @@ inline bool operator!=(String lhs, String rhs) {
     return !(equal(lhs, rhs));
 }
 
-inline bool contains(String str, String search) {
+inline b32 contains(String str, String search) {
     for (s64 i = 0; i < str.size; i += 1) {
         if (i + search.size > str.size) return false;
 
@@ -69,7 +69,7 @@ inline b32 starts_with(String str, String begin) {
     return str == begin;
 }
 
-inline bool ends_with(String str, String search) {
+inline b32 ends_with(String str, String search) {
     if (str.size < search.size) return false;
 
     str.data += str.size - search.size;

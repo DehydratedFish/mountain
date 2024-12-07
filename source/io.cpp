@@ -212,28 +212,41 @@ s64 format(StringBuilder *builder, char const *fmt, ...) {
     return result;
 }
 
-String format(char const *fmt, ...) {
+
+INTERNAL String format(Allocator alloc, char const *fmt, va_list args) {
     StringBuilder builder = {};
     DEFER(destroy(&builder));
 
+    format(&builder, fmt, args);
+
+    return to_allocated_string(&builder, alloc);
+}
+
+String format(Allocator alloc, char const *fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    format(&builder, fmt, args);
+    String result = format(alloc, fmt, args);
     va_end(args);
 
-    return to_allocated_string(&builder);
+    return result;
+}
+
+String format(char const *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    String result = format(DefaultAllocator, fmt, args);
+    va_end(args);
+
+    return result;
 }
 
 String t_format(char const *fmt, ...) {
-    StringBuilder builder = {};
-    DEFER(destroy(&builder));
-
     va_list args;
     va_start(args, fmt);
-    format(&builder, fmt, args);
+    String result = format(TempAllocator, fmt, args);
     va_end(args);
 
-    return to_allocated_string(&builder, TempAllocator);
+    return result;
 }
 
 INTERNAL s64 write(PlatformFile *file, void const *buffer, s64 size) {

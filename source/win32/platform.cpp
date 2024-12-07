@@ -131,10 +131,41 @@ int main() {
 }
 
 
+inline constexpr s64 wide_string_length(wchar_t const *str) {
+    if (str == 0) return 0;
+
+    s64 size = 0;
+    for (; str[size]; size += 1);
+
+    return size;
+}
+
 struct WideString {
     wchar_t *data;
     s64      size;
+
+    WideString() = default;
+    constexpr WideString(u16 const *str, s64 length)
+    : data((wchar_t*)str), size(length) {}
+
+    constexpr WideString(wchar_t const *str)
+    : data((wchar_t*)str), size(wide_string_length(str)) {}
+
+    constexpr WideString(String16 str)
+    : data((wchar_t*)str.data), size(str.size) {}
 };
+
+INTERNAL bool operator==(WideString lhs, WideString rhs) {
+    if (lhs.size == rhs.size) {
+        for (s64 i = 0; i < lhs.size; i += 1) {
+            if (lhs.data[i] != rhs.data[i]) return false;
+        }
+
+        return true;
+    }
+
+    return false;
+}
 
 INTERNAL WideString widen(String str, Allocator alloc = TempAllocator) {
     s64 length = utf16_string_length(str) + 1;
@@ -146,7 +177,7 @@ INTERNAL WideString widen(String str, Allocator alloc = TempAllocator) {
     to_utf16(result, str);
     result.data[length - 1] = L'\0';
 
-    return {(wchar_t*)result.data, result.size};
+    return result;
 }
 
 INTERNAL void convert_slash_to_backslash(String16 str) {
@@ -173,7 +204,7 @@ INTERNAL WideString widen_path(String str, Allocator alloc = TempAllocator) {
 
     convert_slash_to_backslash(path);
 
-    return {(wchar_t*)data, total_size};
+    return {data, total_size};
 }
 
 
@@ -319,7 +350,8 @@ INTERNAL void delete_folder_content(WideString path) {
     do {
         SCOPE_TEMP_STORAGE();
 
-        WideString item = {data.file_name, (s64)wcslen(data.file_name)};
+        WideString item = data.file_name;
+        if (item == L"." || item == L"..") continue;
 
         s64 total_length = search.size + item.size;
         WideString item_path = {};
