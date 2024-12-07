@@ -770,6 +770,28 @@ PlatformExecutionContext platform_execute(String command) {
 }
 
 
+String platform_current_folder(Allocator alloc) {
+    // NOTE: Can't scope TempAlloc here as the return can also be a temporary allocation.
+
+    u32 length = GetCurrentDirectoryW(0, 0);
+    wchar_t *buffer = ALLOC(TempAllocator, wchar_t, length);
+
+    // TODO: Can this contain the \\?\ prefix?
+    if (GetCurrentDirectoryW(length, buffer) != length - 1) return {};
+    convert_backslash_to_slash(buffer, length - 1);
+
+    String16 wide_string = {(u16*)buffer, length - 1};
+    s64 utf_length = utf8_string_length(wide_string);
+
+    String result = allocate_string(utf_length, alloc);
+    to_utf8(result, wide_string);
+
+    // NOTE: Only works if alloc is not the TempAllocator, but better than nothing.
+    DEALLOC(TempAllocator, buffer, length);
+
+    return result;
+}
+
 String platform_config_folder(Allocator alloc) {
     wchar_t *buffer;
     if (SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, 0, &buffer) != S_OK) return {};
