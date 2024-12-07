@@ -264,9 +264,11 @@ WIN32_FUNC_DEF(int) MessageBoxW(HWND wnd, wchar_t const *text, wchar_t const *ca
 u32 const GENERIC_WRITE = 0x40000000;
 u32 const GENERIC_READ  = 0x80000000;
 
+u32 const CREATE_NEW    = 1;
 u32 const CREATE_ALWAYS = 2;
 u32 const OPEN_EXISTING = 3;
 u32 const OPEN_ALWAYS   = 4;
+u32 const TRUNCATE_EXISTING = 5;
 
 u32 const FILE_ATTRIBUTE_DIRECTORY = 0x00000010;
 u32 const FILE_ATTRIBUTE_NORMAL    = 0x00000080;

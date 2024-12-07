@@ -242,7 +242,9 @@ PlatformFile platform_file_open(String filename, PlatformFileOptions options) {
     if (options.write) mode |= GENERIC_WRITE;
     
     u32 open_mode = OPEN_ALWAYS;
-    if (options.file_must_exist) open_mode = OPEN_EXISTING; 
+    if (options.file_must_exist && options.truncate_file) open_mode = TRUNCATE_EXISTING;
+    else if (options.file_must_exist)                     open_mode = OPEN_EXISTING;
+    else if (options.truncate_file)                       open_mode = CREATE_ALWAYS;
 
     PlatformFile result = {};
 

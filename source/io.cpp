@@ -459,6 +459,17 @@ s64 format(struct PlatformFile *file, char const *fmt, va_list args) {
 }
 
 
+b32 write_builder_to_file(StringBuilder *builder, PlatformFile *file) {
+    for (auto *block = &builder->first; block != 0; block = block->next) {
+        if (platform_write(file, block->buffer, block->used) != block->used) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
 /******************************************************************************
  *
  * Section for the floating point conversion stuff... this is very complex and

@@ -9,6 +9,7 @@ struct PlatformFileOptions {
     u8 read:  1;
     u8 write: 1;
     u8 file_must_exist: 1;
+    u8 truncate_file: 1;
 };
 struct PlatformFile {
     void *handle;
@@ -19,6 +20,21 @@ struct PlatformFile {
 };
 
 PlatformFileOptions const PlatformFileRead = {
+    true,
+    false,
+    true,
+    false,
+};
+
+PlatformFileOptions const PlatformFileUpdate = {
+    false,
+    true,
+    false,
+    false,
+};
+
+PlatformFileOptions const PlatformFileOverride = {
+    false,
     true,
     false,
     true,

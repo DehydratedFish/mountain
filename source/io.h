@@ -253,6 +253,7 @@ String format(char const *fmt, ...);
 String t_format(char const *fmt, ...);
 String format(Allocator alloc, char const *fmt, ...);
 
+b32 write_builder_to_file(StringBuilder *builder, PlatformFile *file);
 
 void change_log_file(struct PlatformFile *file);
 void log_internal(char const *func, char const *file, int line, char const *fmt, ...);
