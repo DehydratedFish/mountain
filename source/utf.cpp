@@ -402,7 +402,7 @@ UTFResult to_utf16(String16 buffer, String string) {
             pos += 2;
         }
 
-        shrink_front(string, info.bytes);
+        string = shrink_front(string, info.bytes);
         info = utf8_info(string);
     }
 
