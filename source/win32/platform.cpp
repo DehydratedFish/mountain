@@ -800,8 +800,11 @@ String platform_config_folder(Allocator alloc) {
 
     String16 path = {(u16*)buffer, (s64)wcslen(buffer)};
     convert_backslash_to_slash(buffer, path.size);
+
+    s64 utf8_length = utf8_string_length(path);
     
-    String result = to_utf8(alloc, path);
+    String result = allocate_string(utf8_length, alloc);
+    to_utf8(result, path);
     CoTaskMemFree(buffer);
 
     return result;

@@ -130,7 +130,7 @@ String to_utf8(Allocator alloc, String16 string) {
     if (string.size == 0) return {};
 
     List<u8> buffer = {};
-    prealloc(&buffer, utf8_string_length(string), alloc);
+    init(&buffer, utf8_string_length(string), alloc);
 
     UTF16GetResult c = get_utf16(&string);
     while (c.status == GET_OK) {
