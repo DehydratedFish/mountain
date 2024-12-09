@@ -68,7 +68,7 @@ UTFResult to_utf8(String buffer, String16 string) {
     while (string.size) {
         if (info.status != UTF_OK) return info.status;
 
-        if (info.bytes == 1) {
+        if (info.bytes == 2) {
             if (pos + 3 >= buffer.size) return UTF_BUFFER_TOO_SHORT;
 
             u32 cp = ((info.byte[0] - 0xD800) >> 10) + (info.byte[1] - 0xDC00) + 0x10000;
