@@ -189,7 +189,7 @@ INTERNAL void convert_slash_to_backslash(String16 str) {
 // NOTE: This is needed for paths to prepend \\?\ to it, else paths can only
 //       be MAX_PATH long.
 INTERNAL WideString widen_path(String str, Allocator alloc = TempAllocator) {
-    String const prefix = "\\\\?\\";
+    WideString const prefix = L"\\\\?\\";
 
     s64 length = utf16_string_length(str);
     if (length <= 0) return {};
@@ -198,7 +198,7 @@ INTERNAL WideString widen_path(String str, Allocator alloc = TempAllocator) {
     u16 *data = ALLOC(alloc, u16, total_size);
 
     String16 path = {data + prefix.size, length};
-    copy_memory(data, prefix.data, prefix.size);
+    copy_memory(data, prefix.data, prefix.size * sizeof(*prefix.data));
     to_utf16(path, str);
     data[total_size - 1] = '\0';
 
