@@ -168,7 +168,10 @@ INTERNAL bool operator==(WideString lhs, WideString rhs) {
 }
 
 INTERNAL WideString widen(String str, Allocator alloc = TempAllocator) {
-    s64 length = utf16_string_length(str) + 1;
+    s64 length = utf16_string_length(str);
+    if (length == -1) return {};
+
+    length += 1;
 
     String16 result = {};
     result.data = ALLOC(alloc, u16, length);
@@ -192,7 +195,7 @@ INTERNAL WideString widen_path(String str, Allocator alloc = TempAllocator) {
     WideString const prefix = L"\\\\?\\";
 
     s64 length = utf16_string_length(str);
-    if (length <= 0) return {};
+    if (length == -1) return {};
 
     s64 total_size = prefix.size + length + 1;
     u16 *data = ALLOC(alloc, u16, total_size);
@@ -777,6 +780,8 @@ String platform_current_folder(Allocator alloc) {
 
     u32 length = GetCurrentDirectoryW(0, 0);
     wchar_t *buffer = ALLOC(TempAllocator, wchar_t, length);
+    // NOTE: Only works if alloc is not the TempAllocator, but better than nothing.
+    DEFER(DEALLOC(TempAllocator, buffer, length));
 
     // TODO: Can this contain the \\?\ prefix?
     if (GetCurrentDirectoryW(length, buffer) != length - 1) return {};
@@ -784,12 +789,10 @@ String platform_current_folder(Allocator alloc) {
 
     String16 wide_string = {(u16*)buffer, length - 1};
     s64 utf_length = utf8_string_length(wide_string);
+    if (utf_length == -1) return {};
 
     String result = allocate_string(utf_length, alloc);
     to_utf8(result, wide_string);
-
-    // NOTE: Only works if alloc is not the TempAllocator, but better than nothing.
-    DEALLOC(TempAllocator, buffer, length);
 
     return result;
 }
@@ -797,15 +800,16 @@ String platform_current_folder(Allocator alloc) {
 String platform_config_folder(Allocator alloc) {
     wchar_t *buffer;
     if (SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, 0, &buffer) != S_OK) return {};
+    DEFER(CoTaskMemFree(buffer));
 
     String16 path = {(u16*)buffer, (s64)wcslen(buffer)};
     convert_backslash_to_slash(buffer, path.size);
 
     s64 utf8_length = utf8_string_length(path);
+    if (utf8_length == -1) return {};
     
     String result = allocate_string(utf8_length, alloc);
     to_utf8(result, path);
-    CoTaskMemFree(buffer);
 
     return result;
 }

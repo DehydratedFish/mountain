@@ -41,21 +41,24 @@ INTERNAL UTF16GetResult get_utf16(String16 *string) {
 s64 utf8_string_length(String16 string) {
     s64 length = 0;
 
-    UTF16GetResult c = get_utf16(&string);
-    while (c.status == GET_OK) {
-        if (c.is_surrogate) {
+    UTF16Info info = {};
+    while (string.size) {
+        info = utf16_info(string);
+
+        if (info.bytes == 2) {
             length += 4;
         } else {
-            if (c.value[0] < 0x80) {
+            if (info.byte[0] < 0x80) {
                 length += 1;
-            } else if (c.value[0] < 0x800) {
+            } else if (info.byte[0] < 0x800) {
                 length += 2;
             } else {
                 length += 3;
             }
         }
 
-        c = get_utf16(&string);
+        string.data += info.bytes;
+        string.size -= info.bytes;
     }
 
     return length;
@@ -130,7 +133,7 @@ String to_utf8(Allocator alloc, String16 string) {
     if (string.size == 0) return {};
 
     List<u8> buffer = {};
-    init(&buffer, utf8_string_length(string), alloc);
+    buffer.allocator = alloc;
 
     UTF16GetResult c = get_utf16(&string);
     while (c.status == GET_OK) {
@@ -337,17 +340,24 @@ UTF16Info utf16_info(String16 string) {
  * https://stackoverflow.com/questions/73758747/looking-for-the-description-of-the-algorithm-to-convert-utf8-to-utf16
  */
 s64 utf16_string_length(String string) {
-    s64 offset = 0x00;
-    u32 status = GET_OK;
-    while (status == GET_OK) {
-        UTF8GetResult c = get_utf8(string, offset);
-        status = c.status;
-        if (c.status != GET_OK) return -1;
+    s64 length = 0x00;
 
-        offset += c.size;
+    UTF8Info info = {};
+    while (string.size) {
+        info = utf8_info(string);
+        if (info.status != UTF_OK) return -1;
+
+        if (info.bytes == 4) {
+            length += 2;
+        } else {
+            length += 1;
+        }
+
+        string.data += info.bytes;
+        string.size -= info.bytes;
     }
 
-    return offset;
+    return length;
 }
 
 UTFResult to_utf16(String16 buffer, String string) {
