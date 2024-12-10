@@ -66,6 +66,7 @@ extern PlatformTerminal Console;
 enum {
     PLATFORM_READ_OK,
     PLATFORM_READ_ERROR = 0x01,
+    PLATFORM_FILE_NOT_FOUND = 0x02,
 };
 struct PlatformReadResult {
     String content;

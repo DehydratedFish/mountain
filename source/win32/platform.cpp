@@ -445,7 +445,11 @@ PlatformReadResult platform_read_entire_file(String file, Allocator alloc) {
     WideString wide_file = widen_path(file);
     void *handle = CreateFileW(wide_file.data, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
     if (handle == INVALID_HANDLE_VALUE) {
-        result.error = PLATFORM_READ_ERROR;
+        if (GetLastError() == ERROR_FILE_NOT_FOUND) {
+            result.error = PLATFORM_FILE_NOT_FOUND;
+        } else {
+            result.error = PLATFORM_READ_ERROR;
+        }
 
         return result;
     }

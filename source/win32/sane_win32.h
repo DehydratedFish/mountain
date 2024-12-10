@@ -272,6 +272,8 @@ u32 const TRUNCATE_EXISTING = 5;
 
 u32 const FILE_ATTRIBUTE_DIRECTORY = 0x00000010;
 u32 const FILE_ATTRIBUTE_NORMAL    = 0x00000080;
+
+u32 const ERROR_FILE_NOT_FOUND = 0x02;
 WIN32_FUNC_DEF(void*) CreateFileW(wchar_t *file_name, u32 desired_access, u32 share_mode, SECURITY_ATTRIBUTES *security_attributes, u32 creation_disposition, u32 flags_and_attributes, void *template_file);
 
 WIN32_FUNC_DEF(b32) ReadFile(void *file, void *buffer, u32 number_of_bytes_to_read, u32 *number_of_bytes_read, OVERLAPPED *overlapped);
