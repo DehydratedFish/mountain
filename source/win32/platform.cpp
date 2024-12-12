@@ -225,7 +225,7 @@ INTERNAL WideString widen_path(String str, Allocator alloc = TempAllocator) {
         path = {data + prefix.size, full_length};
         copy_memory(data, prefix.data, prefix.size * sizeof(*prefix.data));
 
-        if (GetFullPathNameW(tmp.data, full_length + 1, (wchar_t*)path.data, 0) != full_length + 1) {
+        if (GetFullPathNameW(tmp.data, full_length + 1, (wchar_t*)path.data, 0) != full_length - 1) {
             return {};
         }
     } else {
