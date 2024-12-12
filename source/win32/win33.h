@@ -152,6 +152,7 @@ WIN32_FUNC_DEF(void)      PostQuitMessage(int exit_code);
 WIN32_FUNC_DEF(sPtr)      DefWindowProcW(HWND wnd, u32 msg, uPtr w_param, sPtr l_param);
 WIN32_FUNC_DEF(u32)       GetLastError();
 WIN32_FUNC_DEF(u32)       GetCurrentDirectoryW(u32 buffer_length, wchar_t *buffer);
+WIN32_FUNC_DEF(u32)       GetFullPathNameW(wchar_t const *file_name, u32 buffer_length, wchar_t *buffer, wchar_t *file_part);
 
 // LoadCursor
 wchar_t const * const IDC_ARROW = (wchar_t const*)(u16)32512;

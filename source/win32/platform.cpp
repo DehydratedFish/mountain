@@ -189,21 +189,54 @@ INTERNAL void convert_slash_to_backslash(String16 str) {
     }
 }
 
-// NOTE: This is needed for paths to prepend \\?\ to it, else paths can only
-//       be MAX_PATH long.
+// TODO: There is the PathIsRelativeW() function in win32. But I would need another
+//       temp copy just to use it. Also it sometimes seems to not work correctly.
+INTERNAL b32 is_relative(String str) {
+    if (starts_with(str, "/") || starts_with(str, "\\")) return false;
+    if (starts_with(str, "//") || starts_with(str, "\\\\")) return false;
+
+    // NOTE: Volume designator e.g. C\:
+    str = shrink_front(str);
+    if (starts_with(str, "\\:") || starts_with(str, "/:")) return false;
+
+    return true;
+}
+
 INTERNAL WideString widen_path(String str, Allocator alloc = TempAllocator) {
     WideString const prefix = L"\\\\?\\";
 
     s64 length = utf16_string_length(str);
     if (length == -1) return {};
 
-    s64 total_size = prefix.size + length + 1;
-    u16 *data = ALLOC(alloc, u16, total_size);
+    s64 total_size = 0;
+    u16 *data      = 0;
 
-    String16 path = {data + prefix.size, length};
-    copy_memory(data, prefix.data, prefix.size * sizeof(*prefix.data));
-    to_utf16(path, str);
-    data[total_size - 1] = '\0';
+// NOTE: This is needed for paths to prepend \\?\ to it, else paths can only
+//       be MAX_PATH long. Using own function because there is no need for
+//       an additional allocations.
+    String16 path = {};
+    if (is_relative(str)) {
+        WideString tmp = widen(str);
+        u32 full_length = GetFullPathNameW(tmp.data, 0, 0, 0);
+
+        total_size = prefix.size + full_length + 1;
+        data = ALLOC(alloc, u16, total_size);
+
+        path = {data + prefix.size, full_length};
+        copy_memory(data, prefix.data, prefix.size * sizeof(*prefix.data));
+
+        if (GetFullPathNameW(tmp.data, full_length + 1, (wchar_t*)path.data, 0) != full_length + 1) {
+            return {};
+        }
+    } else {
+        total_size = prefix.size + length + 1;
+        data = ALLOC(alloc, u16, total_size);
+
+        path = {data + prefix.size, length};
+        copy_memory(data, prefix.data, prefix.size * sizeof(*prefix.data));
+        to_utf16(path, str);
+        data[total_size - 1] = '\0';
+    }
 
     convert_slash_to_backslash(path);
 
@@ -440,6 +473,8 @@ void platform_create_all_folders(String names) {
 
 
 PlatformReadResult platform_read_entire_file(String file, Allocator alloc) {
+    SCOPE_TEMP_STORAGE();
+
     PlatformReadResult result = {};
 
     WideString wide_file = widen_path(file);
