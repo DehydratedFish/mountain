@@ -449,7 +449,7 @@ INTERNAL String path_element(String path) {
     for (s64 i = 0; i < path.size; i += 1) {
         if (path[i] == '/' || path[i] == '\\') {
             if (path.size == 0) continue;
-
+            
             break;
         }
         result.size += 1;
@@ -466,7 +466,8 @@ void platform_create_all_folders(String names) {
     while (folder.size) {
         platform_create_folder(folder);
 
-        shrink_front(names, folder.size += 1);
+        if (folder.size != names.size) folder.size += 1; // NOTE: Trailing slash.
+        shrink_front(names, folder.size);
     }
 }
 
