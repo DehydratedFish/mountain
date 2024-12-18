@@ -442,26 +442,17 @@ b32 platform_create_folder(String name) {
     return result;
 }
 
-INTERNAL void path_element(String path, String *it) {
-    if (it->size == 0) it->data = path.data;
-
-    for (s64 i = it->size; i < path.size; i += 1) {
-        if (path[i] == '/' || path[i] == '\\') {
-            break;
-        }
-        it->size += 1;
-    }
-}
-
 void platform_create_all_folders(String names) {
     SCOPE_TEMP_STORAGE();
 
-    String it = {};
-    do {
-        path_element(names, &it);
-
-        platform_create_folder(it);
-    } while (it.size < names.size);
+    String path = {names.data, 0};
+    for (s64 pos = 0; pos < names.size; pos += 1) {
+        if (names[pos] == '/' || names[pos] == '\\') {
+            path.size = pos;
+            platform_create_folder(path);
+        }
+    }
+    platform_create_folder(names);
 }
 
 
