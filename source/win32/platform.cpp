@@ -838,6 +838,22 @@ String platform_config_folder(Allocator alloc) {
     return result;
 }
 
+String platform_home_folder(Allocator alloc) {
+    wchar_t *buffer;
+    if (SHGetKnownFolderPath(FOLDERID_Profile, 0, 0, &buffer) != S_OK) return {};
+    DEFER(CoTaskMemFree(buffer));
+
+    String16 path = {(u16*)buffer, (s64)wcslen(buffer)};
+    convert_backslash_to_slash(buffer, path.size);
+
+    s64 utf8_length = utf8_string_length(path);
+    if (utf8_length == -1) return {};
+    
+    String result = allocate_string(utf8_length, alloc);
+    to_utf8(result, path);
+
+    return result;
+}
 
 
 INTERNAL u32 process_scan_code(sPtr l_param) {
