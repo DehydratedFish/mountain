@@ -192,6 +192,7 @@ INTERNAL void convert_slash_to_backslash(String16 str) {
 // TODO: There is the PathIsRelativeW() function in win32. But I would need another
 //       temp copy just to use it. Also it sometimes seems to not work correctly.
 INTERNAL b32 is_relative(String str) {
+    if (str == "") return false;
     if (starts_with(str, "/") || starts_with(str, "\\")) return false;
     if (starts_with(str, "//") || starts_with(str, "\\\\")) return false;
 
