@@ -443,17 +443,18 @@ b32 platform_create_folder(String name) {
     return result;
 }
 
-void platform_create_all_folders(String names) {
+b32 platform_create_all_folders(String names) {
     SCOPE_TEMP_STORAGE();
 
     String path = {names.data, 0};
     for (s64 pos = 0; pos < names.size; pos += 1) {
         if (names[pos] == '/' || names[pos] == '\\') {
             path.size = pos;
-            platform_create_folder(path);
+            if (!platform_create_folder(path)) return false;
         }
     }
-    platform_create_folder(names);
+
+    return platform_create_folder(names);
 }
 
 

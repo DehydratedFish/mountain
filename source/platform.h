@@ -53,7 +53,7 @@ b32    platform_flush_write_buffer(PlatformFile *file);
 void platform_delete_file(String path);
 void platform_delete_folder_content(String path);
 b32  platform_create_folder(String name);
-void platform_create_all_folders(String names);
+b32  platform_create_all_folders(String names);
 
 
 struct PlatformTerminal {
