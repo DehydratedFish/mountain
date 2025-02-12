@@ -289,6 +289,7 @@ WIN32_FUNC_DEF(u32) SetFilePointer(void *file, s32 distance_to_move, s32 *distan
 u32 const ERROR_ALREADY_EXISTS = 0xB7;
 WIN32_FUNC_DEF(b32) CreateDirectoryW(wchar_t *path_name, SECURITY_ATTRIBUTES *security_attributes);
 WIN32_FUNC_DEF(b32) RemoveDirectoryW(wchar_t *file_name);
+WIN32_FUNC_DEF(b32) MoveFileW(wchar_t *existing_file_name, wchar_t *new_file_name);
 WIN32_FUNC_DEF(b32) DeleteFileW(wchar_t *file_name);
 WIN32_FUNC_DEF(u32) GetFileAttributesW(wchar_t *file_name);
 WIN32_FUNC_DEF(b32) PathFileExistsW(wchar_t *path);

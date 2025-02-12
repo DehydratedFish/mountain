@@ -50,10 +50,13 @@ s64    platform_write(PlatformFile *file, u64 offset, void const *buffer, s64 si
 b32    platform_flush_write_buffer(PlatformFile *file);
 
 // NOTE: Does also delete folders.
-void platform_delete_file(String path);
+b32  platform_delete_file(String path);
 void platform_delete_folder_content(String path);
 b32  platform_create_folder(String name);
 b32  platform_create_all_folders(String names);
+b32  platform_rename_file(String from, String to);
+
+String platform_line_ending();
 
 
 struct PlatformTerminal {
@@ -96,6 +99,8 @@ b32 platform_is_running(PlatformWindow *window);
 void platform_change_title(PlatformWindow *window, String title);
 void platform_swap_buffers(PlatformWindow *window);
 
+V2i platform_size(PlatformWindow *window);
+
 
 enum PlatformUpdateFlags {
     PLATFORM_UPDATE_WINDOW_SIZE    = 0x01,
@@ -129,7 +134,7 @@ s32 application_main(Array<String> args);
 
 
 
-#ifndef PLATFORM_NO_OPENGL
+#ifdef PLATFORM_OPENGL_INTEGRATION
 
 struct PlatformOpenGLContext;
 PlatformOpenGLContext *platform_opengl_create_context (PlatformWindow *window);
@@ -140,5 +145,5 @@ void                   platform_opengl_delete_context(PlatformOpenGLContext *con
 typedef void*(PlatformGLLoaderFunc)(PlatformOpenGLContext *context, String name);
 PlatformGLLoaderFunc *platform_gl_loader();
 
-#endif // #ifndef PLATFORM_NO_OPENGL
+#endif // #ifdef PLATFORM_OPENGL_INTEGRATION
 

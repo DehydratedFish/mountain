@@ -41,19 +41,17 @@ typedef s8  b8;
 typedef s32 b32;
 
 
+// TODO: I don't feel good about this being in the main utility include.
 struct V2i {
     union {
         struct {
-            s32 x;
-            s32 y;
+            s32 x, y;
         };
         struct {
-            s32 width;
-            s32 height;
+            s32 w, h;
         };
     };
 };
-
 
 void fire_assert(char const *msg, char const *func, char const *file, int line);
 void die(const char *msg);

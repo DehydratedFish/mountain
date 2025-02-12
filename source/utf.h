@@ -93,6 +93,9 @@ UTF8CharResult utf8_peek(String str);
 u8 *next_utf8_sequence(String text, u8 *pos);
 u8 *previous_utf8_sequence(String text, u8 *pos);
 
+// NOTE: This is in codepoints.
+s64 utf8_string_length(String text);
+
 UTF8CharResult to_utf8(u32 cp);
 u32 to_utf32(u16 *str);
 

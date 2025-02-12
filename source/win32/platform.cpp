@@ -412,18 +412,21 @@ INTERNAL void delete_folder_content(WideString path) {
     FindClose(handle);
 }
 
-void platform_delete_file(String path) {
+b32 platform_delete_file(String path) {
     SCOPE_TEMP_STORAGE();
 
     WideString wide_path = widen_path(path);
     u32 attribs = GetFileAttributesW(wide_path.data);
 
+    b32 result = false;
     if (attribs & FILE_ATTRIBUTE_DIRECTORY) {
         delete_folder_content(wide_path);
-        RemoveDirectoryW(wide_path.data);
+        result = RemoveDirectoryW(wide_path.data);
     } else {
-        DeleteFileW(wide_path.data);
+        result = DeleteFileW(wide_path.data);
     }
+
+    return result;
 }
 
 void platform_delete_folder_content(String path) {
@@ -438,7 +441,12 @@ b32 platform_create_folder(String name) {
     WideString wide_name = widen_path(name);
 
     b32 result = CreateDirectoryW(wide_name.data, 0);
-    if (GetLastError() == ERROR_ALREADY_EXISTS) result = true; 
+    if (result == 0) {
+        s32 error = GetLastError();
+        if (error == ERROR_ALREADY_EXISTS) {
+            result = true;
+        }
+    }
 
     return result;
 }
@@ -446,17 +454,36 @@ b32 platform_create_folder(String name) {
 b32 platform_create_all_folders(String names) {
     SCOPE_TEMP_STORAGE();
 
+    b32 result = false;
+
     String path = {names.data, 0};
     for (s64 pos = 0; pos < names.size; pos += 1) {
         if (names[pos] == '/' || names[pos] == '\\') {
             path.size = pos;
-            if (!platform_create_folder(path)) return false;
+
+            // NOTE: This does not break the loop on false, because for absolute paths
+            //       the first C:\ has a different error code and would not work otherwise.
+            result = platform_create_folder(path);
         }
     }
 
-    return platform_create_folder(names);
+    result = platform_create_folder(names);
+
+    return result;
 }
 
+b32 platform_rename_file(String from, String to) {
+    SCOPE_TEMP_STORAGE();
+
+    WideString wide_from = widen_path(from);
+    WideString wide_to   = widen_path(to);
+
+    return MoveFileW(wide_from.data, wide_to.data);
+}
+
+String platform_line_ending() {
+    return "\r\n";
+}
 
 
 PlatformReadResult platform_read_entire_file(String file, Allocator alloc) {
@@ -535,7 +562,7 @@ INTERNAL void print_stack_trace() {
         return;
     }
 
-    s32 const skipped_frames = 2;
+    s32 const skipped_frames = 2; // NOTE: fire_assert() and print_stack_trace()
     u16 frames = RtlCaptureStackBackTrace(skipped_frames, STACK_TRACE_SIZE, stack, 0);
     SYMBOL_INFO *info = (SYMBOL_INFO *)InfoStorage;
     info->size_of_struct = sizeof(SYMBOL_INFO);
@@ -545,7 +572,8 @@ INTERNAL void print_stack_trace() {
     IMAGEHLP_LINE64 line = {};
     line.size_of_struct = sizeof(line);
 
-    for (int i = 0; i < frames - 8; i += 1) {
+    // NOTE: -5 because some crt startup function and main/main_main.
+    for (int i = 0; i < frames - 5; i += 1) {
         if (SymFromAddr(process, (u64)stack[i], 0, info)) {
             SymGetLineFromAddr64(process, (u64)stack[i], &displacement, &line);
             print("%s(%d): %s\n", line.file_name, line.line_number, info->name);
@@ -567,7 +595,7 @@ void die(char const *msg) {
 
 void fire_assert(char const *msg, char const *func, char const *file, int line) {
     print("Assertion failed: %s\n", msg);
-    print("\t%s\n\t%s:%d\n\n", file, func, line);
+    print("\t%s:%d in function %s\n\n", file, line, func);
 
     print_stack_trace();
 
@@ -725,6 +753,11 @@ void platform_change_title(PlatformWindow *window, String title) {
 
 void platform_swap_buffers(PlatformWindow *window) {
     SwapBuffers(window->dc);
+}
+
+
+V2i platform_size(PlatformWindow *window) {
+    return window->size;
 }
 
 
@@ -1104,8 +1137,8 @@ INTERNAL sPtr CALLBACK main_window_callback(HWND hwnd, u32 msg, uPtr w_param, sP
     case WM_SIZE: {
         PlatformWindow *window = get_platform_window(hwnd);
         window->size_changed = true;
-        window->size.width   = LOWORD(l_param);
-        window->size.height  = HIWORD(l_param);
+        window->size.w = LOWORD(l_param);
+        window->size.h = HIWORD(l_param);
     } break;
 
     default:

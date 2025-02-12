@@ -1,4 +1,4 @@
-#ifndef PLATFORM_NO_OPENGL
+#ifdef PLATFORM_OPENGL_INTEGRATION
 
 #include "platform.h"
 #include "internal.h"
@@ -217,5 +217,5 @@ PlatformGLLoaderFunc *platform_gl_loader() {
     return public_function_loader;
 }
 
-#endif // #ifndef PLATFORM_NO_OPENGL
+#endif // #ifdef PLATFORM_OPENGL_INTEGRATION
 

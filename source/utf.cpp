@@ -581,6 +581,17 @@ u8 *previous_utf8_sequence(String text, u8 *pos) {
 }
 
 
+s64 utf8_string_length(String text) {
+    s64 count = 0;
+
+    for (auto it = make_utf8_it(text); it.valid; next(&it)) {
+        count += 1;
+    }
+
+    return count;
+}
+
+
 UTF8CharResult to_utf8(u32 cp) {
     UTF8CharResult result = {};
     result.cp = cp;

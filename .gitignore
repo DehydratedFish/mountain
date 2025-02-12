@@ -1,4 +1,5 @@
 build
+.bricks
 
 # Config file for the clangd LSP
 compile_flags.txt
