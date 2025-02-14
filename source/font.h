@@ -15,11 +15,16 @@ inline u32 glyph_hash(u32 cp) {
 
 struct CachedGlyph;
 struct GlyphInfo {
-    s16 x, y;
-    s16 width, height;
-    s16 bearing_x;
-    s16 bearing_y;
-	s16 advance;
+    r32 u0, v0, u1, v1;
+    r32 x0, y0, x1, y1;
+
+    r32 advance;
+};
+
+struct FontScaledMetrics {
+    r32 ascent;
+    r32 descent;
+    r32 line_height;
 };
 
 struct Font {
@@ -28,6 +33,7 @@ struct Font {
     String file_content;
     stbtt_fontinfo info;
 
+    r32 pixel_height;
     r32 scale;
 
     r32 ascent;
@@ -53,5 +59,7 @@ struct Font {
 b32  init(Font *font, String file_name, r32 height, s32 atlas_size, Allocator alloc = DefaultAllocator);
 void destroy(Font *font);
 
-GlyphInfo get_glyph(Font *font, u32 cp);
+FontScaledMetrics scaled_line_metrics(Font *font, r32 height);
+
+GlyphInfo get_glyph(Font *font, u32 cp, r32 height);
 

@@ -9,14 +9,11 @@
 #include "stb_truetype.h"
 
 
-// TODO: Using 16bit integers because it should be more than enough.
 struct CachedGlyph {
-    s16 x, y;
-    s16 width, height;
-    s16 bearing_x;
-    s16 bearing_y;
-	s16 advance;
+    r32 u0, v0, u1, v1;
+    r32 x0, y0, x1, y1;
 
+    r32 advance;
     s32 table_index;
 };
 
@@ -38,7 +35,8 @@ b32 init(Font *font, String file_name, r32 height, s32 atlas_size, Allocator all
     stbtt_InitFont(&stb, ttf.data, stbtt_GetFontOffsetForIndex(ttf.data, 0));
     r32 scale = stbtt_ScaleForPixelHeight(&stb, height);
 
-    font->atlas_size = atlas_size;
+    font->pixel_height = height;
+    font->atlas_size   = atlas_size;
 
     int unscaled_ascent, unscaled_descent, unscaled_line_gap;
     stbtt_GetFontVMetrics(&stb, &unscaled_ascent, &unscaled_descent, &unscaled_line_gap);
@@ -104,7 +102,7 @@ INTERNAL CachedGlyph *load_glyph(Font *font, u32 cp) {
         int h = 0;
         int x_offset = 0;
         int y_offset = 0;
-        u8 *bitmap = stbtt_GetGlyphSDF(&font->info, font->scale, glyph, 0, 180, 36, &w, &h, &x_offset, &y_offset);
+        u8 *bitmap = stbtt_GetGlyphSDF(&font->info, font->scale, glyph, 4, 180, 36, &w, &h, &x_offset, &y_offset);
         DEFER(stbtt_FreeSDF(bitmap, 0));
 
         s32 x = (font->cache_used % font->glyph_columns) * font->glyph_width;
@@ -117,14 +115,19 @@ INTERNAL CachedGlyph *load_glyph(Font *font, u32 cp) {
         int advance_width, lsb;
         stbtt_GetGlyphHMetrics(&font->info, glyph, &advance_width, &lsb);
 
+        r32 factor = 1.0f / font->atlas_size;
         CachedGlyph info = {};
-        info.x = x;
-        info.y = y;
-        info.width   = w;
-        info.height  = h;
-        info.bearing_x = x_offset;
-        info.bearing_y = y_offset;
-        info.advance   = (s16)(advance_width * font->scale);
+        info.u0 = x * factor;
+        info.v0 = y * factor;
+        info.u1 = (x + w) * factor;
+        info.v1 = (y + h) * factor;
+
+        info.x0 = (r32)x_offset;
+        info.y0 = (r32)y_offset;
+        info.x1 = (r32)x_offset + w;
+        info.y1 = (r32)y_offset + h;
+
+        info.advance = advance_width * font->scale;
         info.table_index = font->cache_used;
 
         result = insert(&font->glyphs, cp, info);
@@ -136,23 +139,39 @@ INTERNAL CachedGlyph *load_glyph(Font *font, u32 cp) {
     return result;
 }
 
-// TODO: Skip the copy?
-GlyphInfo get_glyph(Font *font, u32 cp) {
-    CachedGlyph *glyph = 0;
+FontScaledMetrics scaled_line_metrics(Font *font, r32 height) {
+    r32 factor = height / font->pixel_height;
+
+    FontScaledMetrics metrics = {};
+    metrics.ascent  = font->ascent * factor;
+    metrics.descent = font->descent * factor;
+    metrics.line_height = font->line_height * factor;
+
+    return metrics;
+}
+
+// TODO: Skip the copy and return a pointer?
+GlyphInfo get_glyph(Font *font, u32 cp, r32 height) {
+    CachedGlyph *cache = 0;
 
     auto result = find(&font->glyphs, cp);
-    if (result.found) glyph = result.found;
-    else              glyph = load_glyph(font, cp);
+    if (result.found) cache = result.found;
+    else              cache = load_glyph(font, cp);
 
-    GlyphInfo info = {};
-    info.x = glyph->x;
-    info.y = glyph->y;
-    info.width   = glyph->width;
-    info.height  = glyph->height;
-    info.bearing_x = glyph->bearing_x;
-    info.bearing_y = glyph->bearing_y;
-    info.advance   = glyph->advance;
+    r32 factor = height / font->pixel_height;
+    GlyphInfo glyph = {};
+    glyph.x0 = cache->x0 * factor;
+    glyph.y0 = cache->y0 * factor;
+    glyph.x1 = cache->x1 * factor;
+    glyph.y1 = cache->y1 * factor;
 
-    return info;
+    glyph.u0 = cache->u0;
+    glyph.v0 = cache->v0;
+    glyph.u1 = cache->u1;
+    glyph.v1 = cache->v1;
+
+    glyph.advance = cache->advance * factor;
+
+    return glyph;
 }
 

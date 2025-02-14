@@ -7,7 +7,7 @@ library: core {
 brick: core_brick {
     include: "source";
     
-    sources: /"source", "io.cpp", "utf.cpp", "ui.cpp";
+    sources: /"source", "io.cpp", "utf.cpp", "ui.cpp", "font.cpp";
     sources(#win32): "source/win32/platform.cpp";
 
     dependencies(#win32): "User32.lib", "Shell32.lib", "Gdi32.lib", "Ole32.lib";

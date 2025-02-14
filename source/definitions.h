@@ -20,6 +20,8 @@
 
 #define C_ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
+#define STRUCT_OFFSET(type, member) ((u64)&(((type*)0)->member))
+
 #define FOR(collection, it) for (auto it = begin(collection); it < end(collection); next_element(&it))
 #define FOR_INDEX(collection, it) ((it) - begin(collection))
 template<class PointerType> void next_element(PointerType **it) { *it += 1; }
@@ -126,6 +128,11 @@ template<class Type>
 struct Array {
     Type *data;
     s64   size;
+
+    // TODO: Using a constructor with initializer_list would bake it possible to
+    //       use the usual array literal syntax.
+    //       But then the c++ header needs to be included and I think
+    //       Array can't be a POD anymore?
 
     Type &operator[](s64 index) {
         if (index < 0) index = size + index;

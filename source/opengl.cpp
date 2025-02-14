@@ -41,6 +41,7 @@ b32 load_opengl_functions(PlatformOpenGLContext *context) {
     LOAD(glGetUniformLocation);
     LOAD(glGetAttribLocation);
     LOAD(glGetUniformBlockIndex);
+    LOAD(glUniformBlockBinding);
     LOAD(glGetShaderiv);
     LOAD(glGetShaderInfoLog);
     LOAD(glGetProgramiv);
