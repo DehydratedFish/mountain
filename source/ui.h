@@ -4,68 +4,81 @@
 #include "io.h"
 #include "list.h"
 #include "arena.h"
+#include "vector.h"
+
+#include "ui_theme.h"
 
 
 struct UI;
 
-typedef void UIFrameFunc(UI *ui);
-typedef V2i  UITextMetricCallback(void *font_id, String text, u32 flags);
-
-struct UIVertex;
 struct UIHittest;
+
+struct UIVertex {
+    V3  pos;
+    V2  uv;
+    u32 color;
+};
 
 struct UIRect {
     s32 x, y, w, h;
 };
 
+struct UIGlyphInfo {
+    r32 u0, v0, u1, v1;
+    s32 x0, y0, x1, y1;
 
-//=============================================================================
-// TODO(design):
-// I am still not quite sure how I want to handle fonts.
-// There are two options I can think of for now that would work for user
-// specified font stuff.
-// 1) Just have a small struct with the font data and a callback for the
-//    metrics of a string/textblock.
-//    This way the UI can ask the font to calculate the bounds, depending
-//    on some options, for it.
-//    This would simplify the UI code for text rendering and storing.
-//    Also it seems quite flexible in terms of how text is stored and
-//    rendered. No vertices are needed which means even a simple software
-//    renderer can draw things.
-//    The big downside of this is that the text can't be preprocessed and
-//    needs to be copied into the draw command. Else it can't be
-//    quaranteed that the strings are not modified in before they are drawn.
-//    Using an Arena should mitigate the issue a lot though.
-// 2) Adding an additional callback function to the struct that queries the
-//    glyph metrics itself. This way the UI can generate the vertex data
-//    directly and no additional allocations are needed.
-//    The downside here would probably be flexibility in how text is drawn
-//    and a lot of function pointer indirection.
-//
-// I go with option one for now as I never done it this way.
-//=============================================================================
+    s32 advance;
+};
+
+typedef V2i  UITextMetricCallback(void *data, String text, r32 height);
+typedef void UIGlyphInfoCallback (void *data, UIGlyphInfo *glyph, u32 cp, r32 height);
 struct UIFont {
     void *font_data;
-    UITextMetricCallback *metrics;
+    UITextMetricCallback *text_metrics;
+    UIGlyphInfoCallback  *glyph_info;
+};
+
+struct UIFontStyle {
+    s32 id;
+    r32 height;
+    u32 fg;
+};
+
+enum UITextAlign {
+    UI_TEXT_ALIGN_LEFT,
+    UI_TEXT_ALIGN_CENTER,
 };
 
 enum UITaskKind {
     UI_TASK_EMPTY,
+    UI_TASK_CLIPPING,
+    UI_TASK_GEOMETRY,
     UI_TASK_TEXT,
 };
 struct UITask {
     UITaskKind kind;
-    u32 flags;
-    UIRect clip;
+    s64 start;
+    s64 count;
 
     union {
         struct {
-            String content;
             s32 font_id;
-            r32 size;
-            u32 color;
         } text;
+        struct {
+            UIRect area;
+        } clipping;
     };
+};
+
+
+enum UIRegionKind {
+    UI_REGION_NONE,
+    UI_REGION_CUSTOM,
+    UI_REGION_TEXT,
+};
+
+struct UIUserRegion {
+    V2i old_widget_cursor;
 };
 
 struct UIWindow {
@@ -75,8 +88,14 @@ struct UIWindow {
     V2i widget_cursor;
     List<UITask> tasks;
     List<UIHittest> hittests;
+
+    UIRegionKind region_kind;
+    UIUserRegion user_region;
+
+    V2i next_widget_offset;
 };
 
+typedef void UIFrameFunc(UI *ui);
 enum UIState {
     UI_STATE_IDLE,
     UI_STATE_INPUT,
@@ -101,6 +120,8 @@ struct UI {
     List<UIFont> fonts;
 
     UIFrameFunc *frame_func;
+
+    List<UIVertex> vertex_buffer;
 };
 
 inline r32 pt(r32 points) {
@@ -114,5 +135,20 @@ s32 add_font(UI *ui, UIFont font);
 
 void do_frame(UI *ui, V2i window_size, UserInput *input);
 
-void text_line(UI *ui, s32 font, r32 size, u32 color, String text);
+void text_line(UI *ui, s32 font, r32 height, String text, u32 color);
+s32  edit_line(UI *ui, UIFontStyle font, String text, s32 indent, s32 cursor);
+
+b32 button(UI *ui, String text, UITheme *custom_theme = 0);
+b32 button(UI *ui, void *id, String text, UITheme *custom_theme = 0);
+
+typedef b32 UICustomKeyCallback(KeyAction *key);
+b32  begin_custom_region(UI *ui, UIRect region, UICustomKeyCallback *key_callback = 0);
+void end_custom_region(UI *ui);
+
+b32  begin_text_edit_region(UI *ui, UIRect region, UICustomKeyCallback *callback);
+void end_text_edit_region(UI *ui);
+
+void offset_next_widget(UI *ui, V2i offset);
+void offset_widgets(UI *ui, V2i offset);
+s32  capture_scroll(UI *ui, void *id, UIRect region);
 

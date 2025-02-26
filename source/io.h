@@ -213,7 +213,7 @@ struct KeyAction {
 };
 
 struct UserMouseInput {
-    V2i cursor_pos;
+    Point cursor_pos;
     b32 keys[MOUSE_KEY_COUNT];
     s32 scroll;
 };
@@ -227,9 +227,10 @@ struct KeyboardActions {
 struct UserInput {
     UserMouseInput mouse;
     UserMouseInput last_mouse;
-    V2i cursor_relative;
+    Point cursor_relative;
 
-    KeyboardState keyboard;
+    KeyboardActions actions;
+    KeyboardState   keyboard;
 };
 
 b32 key_held_down(KeyAction const *key);
@@ -237,6 +238,7 @@ b32 key_held_down(KeyAction const *key);
 
 s64 to_s64(String str);
 u64 to_u64(String str);
+r32 to_r32(String str);
 
 String convert_signed_to_string(u8 *buffer, s32 buffer_size, s64 signed_number, s32 base = 10, b32 uppercase = false, b32 keep_sign = false);
 String convert_unsigned_to_string(u8 *buffer, s32 buffer_size, u64 number, s32 base = 10, b32 uppercase = false);

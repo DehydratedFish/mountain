@@ -49,11 +49,14 @@ void reset_temp_storage() {
 INTERNAL b32 setup_raw_input() {
     // NOTE: If support for generic HID's is needed the code processing the WM_INPUT message needs
     //       to be updated as well.
-    RAWINPUTDEVICE device = {};
-    device.usage_page = HID_USAGE_PAGE_GENERIC;
-    device.usage      = HID_USAGE_GENERIC_MOUSE;
+    RAWINPUTDEVICE devices[2] = {};
+    devices[0].usage_page = HID_USAGE_PAGE_GENERIC;
+    devices[0].usage      = HID_USAGE_GENERIC_MOUSE;
 
-    if (!RegisterRawInputDevices(&device, 1, sizeof(RAWINPUTDEVICE))) {
+    devices[1].usage_page = HID_USAGE_PAGE_GENERIC;
+    devices[1].usage      = HID_USAGE_GENERIC_KEYBOARD;
+
+    if (!RegisterRawInputDevices(devices, 2, sizeof(RAWINPUTDEVICE))) {
         log_error("Could not register raw input devices.\n");
         return false;
     }
@@ -734,6 +737,11 @@ void platform_window_updates(PlatformWindow *window, PlatformUpdateInfo *info, u
         window->mouse.scroll   = 0;
         window->mouse_relative = {};
     }
+    if (flags & PLATFORM_UPDATE_KEYBOARD_INPUT) {
+        // TODO: Reverse?
+        info->input.actions = window->key_actions;
+    }
+    window->key_actions.used = 0;
     /*
     if (flags & PLATFORM_UPDATE_KEYBOARD_INPUT) {
         copy_memory(info->input.key_changes, InternalUserInput.key_changes, sizeof(info->input.key_changes));
@@ -756,7 +764,7 @@ void platform_swap_buffers(PlatformWindow *window) {
 }
 
 
-V2i platform_size(PlatformWindow *window) {
+Dimension platform_size(PlatformWindow *window) {
     return window->size;
 }
 
@@ -911,6 +919,7 @@ INTERNAL u32 process_scan_code(sPtr l_param) {
 }
 
 INTERNAL KeyboardKeyCode ScanCodeMappingTable[] = {
+    KEY_CODE_NONE,
     KEY_CODE_ESCAPE,
     KEY_CODE_1,
     KEY_CODE_2,
@@ -1026,6 +1035,13 @@ INTERNAL KeyboardKeyCode scan_code_to_key_code(u32 scan_code) {
     return result;
 }
 
+INTERNAL void add_key_action(PlatformWindow *window, KeyAction action) {
+    if (window->key_actions.used != MaxKeyActions) {
+        window->key_actions.keys[window->key_actions.used] = action;
+        window->key_actions.used += 1;
+    }
+}
+
 INTERNAL PlatformWindow *get_platform_window(HWND window) {
     return (PlatformWindow*)GetWindowLongPtrW(window, 0);
 }
@@ -1121,9 +1137,9 @@ INTERNAL sPtr CALLBACK main_window_callback(HWND hwnd, u32 msg, uPtr w_param, sP
         RAWINPUT input = {};
         u32 size = sizeof(input);
 
-        // NOTE: We don't care about generic HID's so no dynamic allocation is required.
+        // NOTE: We don't care about generic HID's so no dynamic allocation is required. I think?
         u32 check = GetRawInputData((HRAWINPUT)l_param, RID_INPUT, &input, &size, sizeof(RAWINPUTHEADER));
-        if (check != size) break;
+        if (check > size) break;
 
         // NOTE: Only using raw input for the relative mouse movement.
         //       The cursor position is read from WM_MOUSEMOVE to keep the cursor synced with the system.
@@ -1131,6 +1147,48 @@ INTERNAL sPtr CALLBACK main_window_callback(HWND hwnd, u32 msg, uPtr w_param, sP
             PlatformWindow *window = get_platform_window(hwnd);
             window->mouse_relative.x += input.data.mouse.last_x;
             window->mouse_relative.y += input.data.mouse.last_y;
+        } else if (input.header.type == RIM_TYPEKEYBOARD) {
+            RAWKEYBOARD *keyboard = &input.data.keyboard;
+            if (keyboard->make_code == KEYBOARD_OVERRUN_MAKE_CODE) break;
+
+            s32 scan_code = 0;
+            if (keyboard->make_code) {
+                scan_code = keyboard->make_code;
+                if (keyboard->flags & RI_KEY_E0) scan_code += 0xE000;
+                if (keyboard->flags & RI_KEY_E1) scan_code += 0xE100;
+            } else {
+                scan_code = LOWORD(MapVirtualKeyW(keyboard->v_key, MAPVK_VK_TO_VSC_EX));
+            }
+
+            PlatformWindow *window = get_platform_window(hwnd);
+
+            KeyAction action = {};
+            action.code = scan_code_to_key_code(scan_code);
+            
+            if ((input.data.keyboard.flags & RI_KEY_BREAK)) {
+                action.kind = KEY_ACTION_RELEASE;
+            } else {
+                action.kind = KEY_ACTION_PRESS;
+            }
+
+            // TODO: This could be slow to query on every keystroke.
+            u8 kb[256];
+            GetKeyboardState(kb);
+
+            wchar_t utf16[2];
+            s32 length = ToUnicode(input.data.keyboard.v_key, 0, kb, utf16, 2, 0);
+
+            u32 code_point = 0;
+            if (length > 0) {
+                u32 cp = to_utf32((u16*)utf16);
+                if (cp < 0x20 || cp == 0x7F) cp = 0;
+
+                code_point = cp;
+            }
+
+            action.code_point = code_point;
+
+            add_key_action(window, action);
         }
     } break;
 

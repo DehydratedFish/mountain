@@ -43,17 +43,25 @@ typedef s8  b8;
 typedef s32 b32;
 
 
-// TODO: I don't feel good about this being in the main utility include.
-struct V2i {
+// TODO: Maybe a bit overkill? But I like having the option to shorten the names.
+struct Dimension {
     union {
         struct {
-            s32 x, y;
+            s32 w;
+            s32 h;
         };
         struct {
-            s32 w, h;
+            s32 width;
+            s32 height;
         };
     };
 };
+
+struct Point {
+    s32 x;
+    s32 y;
+};
+
 
 void fire_assert(char const *msg, char const *func, char const *file, int line);
 void die(const char *msg);

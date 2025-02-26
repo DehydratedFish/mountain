@@ -217,13 +217,13 @@ WIN32_FUNC_DEF(sPtr) GetWindowLongPtrW(HWND wnd, int index);
 u32 const PM_REMOVE = 0x0001;
 
 struct MSG {
-    HWND wnd;
-    u32  message;
-    uPtr w_param;
-    sPtr l_param;
-    u32  time;
-    V2i  pt;
-    u32  private_;
+    HWND  wnd;
+    u32   message;
+    uPtr  w_param;
+    sPtr  l_param;
+    u32   time;
+    Point pt;
+    u32   private_;
 };
 WIN32_FUNC_DEF(b32) PeekMessageW(MSG *msg, HWND wnd, u32 msg_filter_min, u32 msg_filter_max, u32 remove_msg);
 WIN32_FUNC_DEF(b32) TranslateMessage(MSG const *msg);
@@ -255,6 +255,9 @@ u32 const STD_INPUT_HANDLE  = -10;
 u32 const STD_OUTPUT_HANDLE = -11;
 u32 const STD_ERROR_HANDLE  = -12;
 WIN32_FUNC_DEF(void*) GetStdHandle(u32 std_handle);
+
+u32 const MAPVK_VK_TO_VSC_EX = 4;
+WIN32_FUNC_DEF(u32) MapVirtualKeyW(u32 code, u32 map_type);
 
 // MessageBoxW
 u32 const MB_OK        = 0x00000000;
@@ -394,7 +397,10 @@ struct RAWMOUSE {
     u32 extra_information;
 };
 
-u16 const RI_KEY_BREAK = 0x01;
+s32 const KEYBOARD_OVERRUN_MAKE_CODE = 0xFF;
+s32 const RI_KEY_BREAK = 0x01;
+s32 const RI_KEY_E0    = 0x02;
+s32 const RI_KEY_E1    = 0x04;
 struct RAWKEYBOARD {
     u16 make_code;
     u16 flags;

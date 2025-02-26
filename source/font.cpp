@@ -2,6 +2,8 @@
 
 #include "platform.h"
 #include "string2.h"
+#include "utf.h"
+
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #define STBTT_STATIC
@@ -123,9 +125,9 @@ INTERNAL CachedGlyph *load_glyph(Font *font, u32 cp) {
         info.v1 = (y + h) * factor;
 
         info.x0 = (r32)x_offset;
-        info.y0 = (r32)y_offset;
-        info.x1 = (r32)x_offset + w;
-        info.y1 = (r32)y_offset + h;
+        info.y0 = (r32)(font->ascent + y_offset);
+        info.x1 = (r32)(x_offset + w);
+        info.y1 = (r32)(info.y0 + h);
 
         info.advance = advance_width * font->scale;
         info.table_index = font->cache_used;
@@ -139,10 +141,10 @@ INTERNAL CachedGlyph *load_glyph(Font *font, u32 cp) {
     return result;
 }
 
-FontScaledMetrics scaled_line_metrics(Font *font, r32 height) {
+ScaledFontMetrics scaled_line_metrics(Font *font, r32 height) {
     r32 factor = height / font->pixel_height;
 
-    FontScaledMetrics metrics = {};
+    ScaledFontMetrics metrics = {};
     metrics.ascent  = font->ascent * factor;
     metrics.descent = font->descent * factor;
     metrics.line_height = font->line_height * factor;
@@ -173,5 +175,34 @@ GlyphInfo get_glyph(Font *font, u32 cp, r32 height) {
     glyph.advance = cache->advance * factor;
 
     return glyph;
+}
+
+FontDimensions text_dimensions(Font *font, String text, r32 height, b32 floor_advance) {
+    FontDimensions dimensions = {};
+
+    ScaledFontMetrics metrics = scaled_line_metrics(font, height);
+    r32 factor = height / font->pixel_height;
+
+    // NOTE: Empty strings should still have a height.
+    s32 lines = 1;
+
+    for (auto it = make_utf8_it(text); it.valid; next(&it)) {
+        CachedGlyph *glyph = 0;
+
+        auto result = find(&font->glyphs, it.cp);
+        if (result.found) glyph = result.found;
+        else              glyph = load_glyph(font, it.cp);
+
+        r32 advance = glyph->advance * factor;
+        if (floor_advance) advance = floor(advance);
+
+        dimensions.width += (s32)advance;
+
+        if (it.cp == '\n') lines += 1;
+    }
+
+    dimensions.height = metrics.line_height * lines;
+
+    return dimensions;
 }
 

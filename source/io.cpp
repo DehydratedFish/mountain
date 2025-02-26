@@ -1,6 +1,7 @@
 #include "io.h"
 
 #include <cstdarg>
+#include <cstdlib>
 
 #include "string_builder.h"
 #include "platform.h"
@@ -50,6 +51,14 @@ u64 to_u64(String str) {
 
 	return result;
 }
+
+// TODO: Using stdlib for now because I am lazy...
+r32 to_r32(String str) {
+    char *c_str = c_string_copy(str, TempAllocator);
+
+    return atof(c_str);
+}
+
 
 String convert_signed_to_string(u8 *buffer, s32 buffer_size, s64 signed_number, s32 base, b32 uppercase, b32 keep_sign) {
     assert(buffer_size >= 20);

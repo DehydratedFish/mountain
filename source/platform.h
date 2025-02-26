@@ -99,7 +99,7 @@ b32 platform_is_running(PlatformWindow *window);
 void platform_change_title(PlatformWindow *window, String title);
 void platform_swap_buffers(PlatformWindow *window);
 
-V2i platform_size(PlatformWindow *window);
+Dimension platform_size(PlatformWindow *window);
 
 
 enum PlatformUpdateFlags {
@@ -110,7 +110,7 @@ enum PlatformUpdateFlags {
 };
 struct PlatformUpdateInfo {
     b32 window_size_changed;
-    V2i window_size;
+    Dimension window_size;
 
     UserInput input;
 

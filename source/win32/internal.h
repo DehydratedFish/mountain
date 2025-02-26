@@ -11,11 +11,11 @@ struct PlatformWindow {
     b32 running;
 
     b32 size_changed;
-    V2i size;
+    Dimension size;
 
     UserMouseInput mouse;
     UserMouseInput last_mouse;
-    V2i mouse_relative;
+    Point mouse_relative;
 
     KeyboardActions key_actions;
 };
