@@ -92,7 +92,7 @@ void maybe_grow(List<Type> *list, s64 needed_alloc) {
 
     if (needed_alloc > list->alloc) {
         s64 new_alloc = list->size * growth;
-        if (needed_alloc > list->alloc) new_alloc = needed_alloc;
+        if (needed_alloc > new_alloc) new_alloc = needed_alloc;
 
         list->data  = REALLOC(list->allocator, list->data, list->alloc, new_alloc);
         list->alloc = new_alloc;
