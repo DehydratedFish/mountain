@@ -111,7 +111,7 @@ struct String {
 
     //NOTE: Reference are not touched and always copied before a change so this cast should be fine.
     constexpr String(char const *str)
-    : data((u8*)str), size(c_string_length(str)) {}
+        :data((u8*)str), size(c_string_length(str)) {}
 
     String &operator=(char const *str) {
         data = (u8*)str;

@@ -6,6 +6,15 @@
 #define PACK_RGB(r, g, b) PACK_RGBA(r, g, b, 255)
 
 
+enum UICursorShape {
+    UI_CURSOR_BLOCK,
+    UI_CURSOR_H_LINE,
+};
+struct UICursorTheme {
+    u32 color;
+    u32 shape;
+};
+
 struct UITheme {
     s32 font_id;
     r32 font_height;

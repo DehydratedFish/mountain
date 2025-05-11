@@ -79,6 +79,7 @@ PlatformReadResult platform_read_entire_file(String file, Allocator alloc = Defa
 
 
 s64 platform_timestamp();
+r64 platform_in_milliseconds(s64 timestamp);
 
 
 struct PlatformDynamicLibrary;

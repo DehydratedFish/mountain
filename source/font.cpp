@@ -154,11 +154,8 @@ ScaledFontMetrics scaled_line_metrics(Font *font, r32 height) {
 
 // TODO: Skip the copy and return a pointer?
 GlyphInfo get_glyph(Font *font, u32 cp, r32 height) {
-    CachedGlyph *cache = 0;
-
-    auto result = find(&font->glyphs, cp);
-    if (result.found) cache = result.found;
-    else              cache = load_glyph(font, cp);
+    CachedGlyph *cache = find(&font->glyphs, cp);
+    if (!cache) cache = load_glyph(font, cp);
 
     r32 factor = height / font->pixel_height;
     GlyphInfo glyph = {};
@@ -187,11 +184,8 @@ FontDimensions text_dimensions(Font *font, String text, r32 height, b32 floor_ad
     s32 lines = 1;
 
     for (auto it = make_utf8_it(text); it.valid; next(&it)) {
-        CachedGlyph *glyph = 0;
-
-        auto result = find(&font->glyphs, it.cp);
-        if (result.found) glyph = result.found;
-        else              glyph = load_glyph(font, it.cp);
+        CachedGlyph *glyph = find(&font->glyphs, it.cp);
+        if (glyph) glyph = load_glyph(font, it.cp);
 
         r32 advance = glyph->advance * factor;
         if (floor_advance) advance = floor(advance);

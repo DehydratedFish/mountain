@@ -154,6 +154,13 @@ Array<Type> insert(List<Type> *list, s64 index, Array<Type> array) {
     return result;
 }
 
+template<class Type>
+void pop(List<Type> *list) {
+    // TODO: Maybe just check if the list is > 0 and not error out?
+    assert(list->size > 0);
+    list->size -= 1;
+}
+
 // NOTE: does not preserve order
 template<class Type>
 void remove(List<Type> *list, s64 index) {

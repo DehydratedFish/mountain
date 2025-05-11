@@ -79,6 +79,8 @@ enum UIRegionKind {
 
 struct UIUserRegion {
     V2i old_widget_cursor;
+    V2i old_reset;
+    UIRect region;
 };
 
 struct UIWindow {
@@ -86,6 +88,7 @@ struct UIWindow {
     UIRect region;
 
     V2i widget_cursor;
+    V2i reset;
     List<UITask> tasks;
     List<UIHittest> hittests;
 
@@ -118,6 +121,7 @@ struct UI {
     List<UIWindow> windows;
 
     List<UIFont> fonts;
+    List<UIRect> clip_stack;
 
     UIFrameFunc *frame_func;
 
@@ -142,11 +146,13 @@ b32 button(UI *ui, String text, UITheme *custom_theme = 0);
 b32 button(UI *ui, void *id, String text, UITheme *custom_theme = 0);
 
 typedef b32 UICustomKeyCallback(KeyAction *key);
-b32  begin_custom_region(UI *ui, UIRect region, UICustomKeyCallback *key_callback = 0);
+b32  begin_custom_region(UI *ui, UIRect region, u32 background = 0);
 void end_custom_region(UI *ui);
 
 b32  begin_text_edit_region(UI *ui, UIRect region, UICustomKeyCallback *callback);
 void end_text_edit_region(UI *ui);
+s32  text_piece(UI *ui, String text, UIFontStyle style, u8 *cursor_pos = 0);
+b32  advance_text_line(UI *ui, s32 line_height);
 
 void offset_next_widget(UI *ui, V2i offset);
 void offset_widgets(UI *ui, V2i offset);

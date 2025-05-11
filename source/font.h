@@ -5,12 +5,14 @@
 
 
 // TODO: Should suffice for testing but a proper hash function is probably needed.
-inline u32 glyph_hash(u32 cp) {
-    cp = ((cp >> 16) ^ cp) * 0x45d9f3b;
-    cp = ((cp >> 16) ^ cp) * 0x45d9f3b;
-    cp =  (cp >> 16) ^ cp;
+inline u32 glyph_hash(u32 *cp) {
+    u32 hash = *cp;
 
-    return cp;
+    hash = ((hash >> 16) ^ hash) * 0x45d9f3b;
+    hash = ((hash >> 16) ^ hash) * 0x45d9f3b;
+    hash =  (hash >> 16) ^ hash;
+
+    return hash;
 }
 
 struct FontDimensions {

@@ -3,6 +3,12 @@
 #include "utf.h"
 
 
+
+INTERNAL UICursorTheme const DefaultCursor {
+    0,
+    UI_CURSOR_BLOCK,
+};
+
 struct UIHittest {
     void *id;
     UIRect rect;
@@ -103,6 +109,30 @@ INTERNAL void *hovered_element(UI *ui) {
     return 0;
 }
 
+// TODO: Concatenate tasks that have the same kind and texture.
+INTERNAL UITask *create_new_task(UI *ui, UITaskKind kind) {
+    UITask task = {};
+    task.kind  = kind;
+    task.start = ui->vertex_buffer.size;
+    
+    return append(&ui->current_window->tasks, task);
+}
+
+// TODO: This is problematic because you can't add vertices to two different
+//       tasks at the same time or the indices will overlap.
+INTERNAL UITask *create_new_task_before(UI *ui, UITaskKind kind) {
+    UITask task = {};
+    task.kind  = kind;
+    task.start = ui->vertex_buffer.size;
+    
+    return insert(&ui->current_window->tasks, -1, task);
+}
+
+INTERNAL void generate_clip_task(UI *ui, UIRect rect) {
+    UITask *task = create_new_task(ui, UI_TASK_CLIPPING);
+    task->clipping.area = rect;
+}
+
 
 INTERNAL void prepare_window(UIWindow *window) {
     window->tasks.size    = 0;
@@ -111,9 +141,27 @@ INTERNAL void prepare_window(UIWindow *window) {
     window->widget_cursor = {0, 0};
 }
 
+INTERNAL void push_clipping(UI *ui, UIRect rect) {
+    append(&ui->clip_stack, rect);
+
+    generate_clip_task(ui, rect);
+}
+
+INTERNAL void pop_clipping(UI *ui) {
+    assert(ui->clip_stack.size > 0);
+    pop(&ui->clip_stack);
+
+    if (ui->clip_stack.size > 0) {
+        generate_clip_task(ui, ui->clip_stack[-1]);
+    } else {
+        generate_clip_task(ui, ui->viewport.region);
+    }
+}
+
 void do_frame(UI *ui, V2i window_size, UserInput *input) {
     assert(input);
     assert(ui->frame_func);
+    assert(ui->clip_stack.size == 0);
     // TODO: Always load a default font.
     assert(ui->fonts.size > 0);
 
@@ -121,6 +169,7 @@ void do_frame(UI *ui, V2i window_size, UserInput *input) {
     ui->viewport.region.h = window_size.h;
 
     ui->per_frame_memory.used = 0;
+    ui->vertex_buffer.size = 0;
 
     ui->input = input;
 
@@ -177,23 +226,12 @@ INTERNAL void add_hittest(UI *ui, void *id, UIRect rect) {
     append(&ui->current_window->hittests, hit);
 }
 
-// TODO: Concatenate tasks that have the same kind and texture.
-INTERNAL UITask *create_new_task(UI *ui, UITaskKind kind) {
-    UITask task = {};
-    task.kind  = kind;
-    task.start = ui->vertex_buffer.size;
-    
-    return append(&ui->current_window->tasks, task);
-}
-
 INTERNAL void append(UI *ui, UITask *task, UIVertex vertex) {
     append(&ui->vertex_buffer, vertex);
     task->count += 1;
 }
 
-INTERNAL void draw_rect(UI *ui, UIRect rect, u32 color) {
-    UITask *task = create_new_task(ui, UI_TASK_GEOMETRY);
-
+INTERNAL void draw_rect(UI *ui, UITask *task, UIRect rect, u32 color) {
     r32 x0 = (r32)rect.x;
     r32 y0 = (r32)rect.y;
     r32 x1 = x0 + rect.w;
@@ -206,6 +244,11 @@ INTERNAL void draw_rect(UI *ui, UIRect rect, u32 color) {
     append(ui, task, {{x0, y1}, {}, color});
     append(ui, task, {{x1, y0}, {}, color});
     append(ui, task, {{x1, y1}, {}, color});
+}
+
+INTERNAL void draw_rect(UI *ui, UIRect rect, u32 color) {
+    UITask *task = create_new_task(ui, UI_TASK_GEOMETRY);
+    draw_rect(ui, task, rect, color);
 }
 
 INTERNAL void glyph_info(UIFont *font, UIGlyphInfo *info, u32 cp, r32 height) {
@@ -257,7 +300,6 @@ INTERNAL void draw_text(UI *ui, s32 font_id, UIRect rect, r32 height, String tex
 
         cursor.x += glyph.advance;
     }
-
 }
 
 void text_line(UI *ui, s32 font, r32 height, String text, u32 color) {
@@ -342,7 +384,7 @@ b32 button(UI *ui, void *id, String text, UITheme *custom_theme) {
     return clicked;
 }
 
-b32 begin_custom_region(UI *ui, UIRect region, u32 background = 0) {
+b32 begin_custom_region(UI *ui, UIRect region, u32 background) {
     b32 open = false;
 
     UIWindow *window = ui->current_window;
@@ -382,6 +424,9 @@ void offset_widgets(UI *ui, V2i offset) {
 
     window->widget_cursor.x += offset.x;
     window->widget_cursor.y += offset.y;
+
+    window->reset.x += offset.x;
+    window->reset.y += offset.y;
 }
 
 s32 capture_scroll(UI *ui, void *id, UIRect region) {
@@ -410,22 +455,118 @@ b32 begin_text_edit_region(UI *ui, UIRect region, UICustomKeyCallback *callback)
 
     window->region_kind = UI_REGION_TEXT;
     window->user_region.old_widget_cursor = window->widget_cursor;
+    window->user_region.old_reset = window->reset;
+    window->user_region.region = region;
 
     window->widget_cursor.x = region.x;
     window->widget_cursor.y = region.y;
+
+    window->reset = window->widget_cursor;
+
+    push_clipping(ui, region);
+
+    if (ui->state == UI_STATE_INPUT && callback) {
+        for (s32 i = 0; i < ui->input->actions.used; i += 1) {
+            callback(&ui->input->actions.keys[i]);
+        }
+    }
 
     return open;
 }
 
 void end_text_edit_region(UI *ui) {
+    UIWindow *window = ui->current_window;
+    assert(window->region_kind == UI_REGION_TEXT);
 
+    window->region_kind   = UI_REGION_NONE;
+    window->widget_cursor = window->user_region.old_widget_cursor;
+    window->reset         = window->user_region.old_reset;
+
+    pop_clipping(ui);
 }
 
-s32 text_piece(UI *ui, String text, UIFontStyle style) {
-    if (ui->state == UI_STATE_DRAW) {
+s32 text_piece(UI *ui, String text, UIFontStyle style, u8 *cursor_pos) {
+    s32 hovered_character = -1;
 
+    // TODO: The hover calculation should actually happen in the input state.
+    //       But that means the string would be processed twice per frame
+    //       and I think that is unnecesarry.
+    if (ui->state == UI_STATE_DRAW) {
+        UITask *task = create_new_task(ui, UI_TASK_TEXT);
+
+        UIFont *font = &ui->fonts[style.id];
+
+        UIRect rect = {};
+        widget_sizing(ui, &rect);
+        V2i cursor = {rect.x, rect.y};
+
+        Point pointer = ui->input->mouse.cursor_pos;
+
+        b32 draw_cursor = false;
+        V2i cursor_bg   = {};
+        s32 cursor_width = 0;
+
+        s32 i = 0;
+        UIGlyphInfo glyph = {};
+        for (auto it = make_utf8_it(text); it.valid; next(&it)) {
+            glyph_info(font, &glyph, it.cp, style.height);
+
+            if (&text[it.index] == cursor_pos) {
+                draw_cursor = true;
+                cursor_bg   = cursor;
+                cursor_width = glyph.advance;
+                draw_character(ui, task, &glyph, cursor, style.height, PACK_RGB(15, 15, 15));
+            } else {
+                draw_character(ui, task, &glyph, cursor, style.height, style.fg);
+            }
+
+            s32 new_x = cursor.x + glyph.advance;
+            if (cursor.x < pointer.x && new_x >= pointer.x) {
+                hovered_character = i;
+            }
+
+            cursor.x = new_x;
+            i += 1;
+        }
+
+        if (end(text) == cursor_pos) {
+            glyph_info(font, &glyph, ' ', style.height);
+            draw_cursor = true;
+            cursor_bg   = cursor;
+            cursor_width = glyph.advance;
+        }
+
+        if (draw_cursor) {
+            UIRect  cursor_quad = {cursor_bg.x, cursor_bg.y, cursor_width, (s32)style.height};
+            UITask *cursor_task = create_new_task_before(ui, UI_TASK_GEOMETRY);
+
+            u32 color = DefaultCursor.color;
+            if (color == 0) color = style.fg;
+            draw_rect(ui, cursor_task, cursor_quad, color);
+        }
+
+        if (pointer.y < cursor.y || pointer.y >= (cursor.y + style.height)) {
+            hovered_character = -1;
+        }
+
+        ui->current_window->widget_cursor.x = cursor.x;
     }
 
-    return 0;
+    return hovered_character;
 }
 
+b32 advance_text_line(UI *ui, s32 line_height) {
+    b32 keep_advancing = false;
+
+    UIWindow *window = ui->current_window;
+    if (window->region_kind != UI_REGION_TEXT) return keep_advancing;
+
+    s32 region_end = window->user_region.region.y + window->user_region.region.h;
+    if (window->widget_cursor.y < region_end) {
+        window->widget_cursor.y += line_height;
+        window->widget_cursor.x  = window->reset.x;
+        keep_advancing = true;
+    }
+
+    return keep_advancing;
+}

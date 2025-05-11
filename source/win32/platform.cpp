@@ -550,6 +550,11 @@ s64 platform_timestamp() {
     return counter;
 }
 
+r64 platform_in_milliseconds(s64 timestamp) {
+    timestamp *= 1000;
+    return (r64)timestamp / QPCFrequency;
+}
+
 
 u32 const STACK_TRACE_SIZE = 64;
 u32 const SYMBOL_NAME_LENGTH = 1024;
@@ -640,6 +645,7 @@ INTERNAL s64 LastTime;
 INTERNAL s64 TimeSinceLastUpdate;
 void platform_update() {
     MSG msg;
+
     while (PeekMessageW(&msg, 0, 0, 0, PM_REMOVE)) {
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
