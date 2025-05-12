@@ -115,6 +115,15 @@ Type *append(List<Type> *list, Type element) {
 }
 
 template<class Type>
+Type *append(List<Type> *list) {
+    maybe_grow(list, list->size + 1);
+
+    list->size += 1;
+
+    return &list->data[list->size - 1];
+}
+
+template<class Type>
 Array<Type> append(List<Type> *list, Array<Type> array) {
     maybe_grow(list, list->size + array.size);
 

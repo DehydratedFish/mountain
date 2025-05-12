@@ -16,7 +16,6 @@ brick: core_brick {
 brick: opengl {
     symbols: "PLATFORM_OPENGL_INTEGRATION";
 
-    sources: "source/opengl.cpp";
     sources(#win32): "source/win32/opengl_adapter.cpp";
 }
 

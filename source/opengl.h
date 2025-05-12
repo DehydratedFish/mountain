@@ -40,11 +40,17 @@ typedef s64 GLintptr;
 #define OPENGL_CALL
 #endif // defined(OS_WINDOWS) && !defined(_WIN64)
 
+/*
 #ifdef OPENGL_DEFINITIONS
 #define OPENGL_FUNC(ret, name, ...) ret OPENGL_CALL (*name)(__VA_ARGS__);
 #else
 #define OPENGL_FUNC(ret, name, ...) extern ret OPENGL_CALL (*name)(__VA_ARGS__);
 #endif // OPENGL_DEFINE_FUNCTIONS
+*/
+
+#define OPENGL_FUNC(ret, name, ...) \
+    typedef ret OPENGL_CALL (name##_proc)(__VA_ARGS__); \
+    extern name##_proc *name;
 
 
 #define GL_FALSE            0
@@ -243,7 +249,4 @@ OPENGL_FUNC(void,   glDrawBuffer, GLenum);
 OPENGL_FUNC(void,   glDrawBuffers, GLenum n, GLenum const*);
 
 #undef OPENGL_FUNC
-
-
-b32 load_opengl_functions(PlatformOpenGLContext *context);
 
