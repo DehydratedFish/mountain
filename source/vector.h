@@ -84,3 +84,8 @@ inline V2i operator-(V2i lhs, s32 val) { lhs.x -= val;   lhs.y -= val;   return 
 inline V2  operator-(V2  lhs, V2  rhs) { lhs.x -= rhs.x; lhs.y -= rhs.y; return lhs; }
 inline V2i operator-(V2i lhs, V2i rhs) { lhs.x -= rhs.x; lhs.y -= rhs.y; return lhs; }
 
+inline V3  operator+(V3  lhs, r32 val) { lhs.x += val;   lhs.y += val;   lhs.z += val;   return lhs; }
+inline V3  operator+(V3  lhs, V3  rhs) { lhs.x += rhs.x; lhs.y += rhs.y; lhs.z += rhs.z; return lhs; }
+inline V3  operator-(V3  lhs, r32 val) { lhs.x -= val;   lhs.y -= val;   lhs.z -= val;   return lhs; }
+inline V3  operator-(V3  lhs, V3  rhs) { lhs.x -= rhs.x; lhs.y -= rhs.y; lhs.z -= rhs.z; return lhs; }
+
