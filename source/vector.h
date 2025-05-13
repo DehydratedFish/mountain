@@ -2,6 +2,8 @@
 
 #include "definitions.h"
 
+#include <cmath>
+
 
 struct V2 {
     union {
@@ -88,4 +90,30 @@ inline V3  operator+(V3  lhs, r32 val) { lhs.x += val;   lhs.y += val;   lhs.z +
 inline V3  operator+(V3  lhs, V3  rhs) { lhs.x += rhs.x; lhs.y += rhs.y; lhs.z += rhs.z; return lhs; }
 inline V3  operator-(V3  lhs, r32 val) { lhs.x -= val;   lhs.y -= val;   lhs.z -= val;   return lhs; }
 inline V3  operator-(V3  lhs, V3  rhs) { lhs.x -= rhs.x; lhs.y -= rhs.y; lhs.z -= rhs.z; return lhs; }
+inline V3  operator*(V3  lhs, r32 val) { lhs.x *= val;   lhs.y *= val;   lhs.z *= val;   return lhs; }
+
+
+
+inline r32 length(V3 vector) {
+    return sqrt((vector.x * vector.x) + (vector.y * vector.y) + (vector.z * vector.z));
+}
+
+inline V3 normalize(V3 vector) {
+    r32 inverse_length = 1.0f / length(vector);
+
+    return vector * inverse_length;
+}
+
+inline r32 dot(V3 lhs, V3 rhs) {
+	return (lhs.x * rhs.x) + (lhs.y * rhs.y) + (lhs.z * rhs.z);
+}
+
+inline V3 cross(V3 lhs, V3 rhs) {
+	V3 v;
+	v.x = (lhs.y * rhs.z) - (rhs.y * lhs.z);
+	v.y = (lhs.z * rhs.x) - (rhs.z * lhs.x);
+	v.z = (lhs.x * rhs.y) - (rhs.x * lhs.y);
+
+	return v;
+}
 
