@@ -80,3 +80,9 @@ Array<Type> array_allocate(s64 size, Allocator alloc = DefaultAllocator) {
     return result;
 }
 
+template<class Type>
+void array_destroy(Array<Type> *arr, Allocator alloc = DefaultAllocator) {
+    DEALLOC(alloc, arr->data, arr->size);
+    INIT_STRUCT(arr);
+}
+
