@@ -71,3 +71,12 @@ inline void copy_memory(void *dest, void const *src, u64 size) {
 }
 
 
+template<class Type>
+Array<Type> array_allocate(s64 size, Allocator alloc = DefaultAllocator) {
+    Array<Type> result;
+    result.data = ALLOC(alloc, Type, size);
+    result.size = size;
+
+    return result;
+}
+
