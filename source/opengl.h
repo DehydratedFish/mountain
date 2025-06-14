@@ -65,9 +65,12 @@ typedef s64 GLintptr;
 #define GL_LINES            0x0001
 #define GL_LINE_STRIP       0x0003
 #define GL_TRIANGLES        0x0004
+#define GL_TRIANGLE_STRIP   0x0005
+#define GL_TRIANGLE_FAN     0x0006
 #define GL_DEPTH_BUFFER_BIT 0x00000100
 #define GL_COLOR_BUFFER_BIT 0x00004000
 #define GL_ARRAY_BUFFER     0x8892
+#define GL_ELEMENT_ARRAY_BUFFER 0x8893
 #define GL_STREAM_DRAW      0x88E0
 #define GL_STATIC_DRAW      0x88E4
 #define GL_DYNAMIC_DRAW     0x88E8
@@ -206,8 +209,10 @@ OPENGL_FUNC(void,   glBufferSubData, GLenum, GLintptr, GLsizeiptr, void const*);
 OPENGL_FUNC(void,   glVertexAttribPointer, GLuint, GLint, GLenum, GLboolean, GLsizei, void const*);
 OPENGL_FUNC(void,   glEnableVertexAttribArray, GLuint);
 OPENGL_FUNC(void,   glUseProgram, GLuint);
+OPENGL_FUNC(void,   glUniform2i, GLint, GLint, GLint);
 OPENGL_FUNC(void,   glUniformMatrix4fv, GLint, GLsizei, GLboolean, GLfloat const*);
 OPENGL_FUNC(void,   glDrawArrays, GLenum, GLint, GLsizei);
+OPENGL_FUNC(void,   glDrawElements, GLenum mode, GLsizei count, GLenum type, void const *indices);
 
 OPENGL_FUNC(GLuint, glCreateShader, GLenum);
 OPENGL_FUNC(void,   glDeleteShader, GLuint);
