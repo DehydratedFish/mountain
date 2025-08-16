@@ -29,3 +29,12 @@ void reverse(Array<Type> array) {
     }
 }
 
+template<class Type>
+b32 contains(Array<Type> array, Type element) {
+    for (s64 i = 0; i < array.size; i += 1) {
+        if (array[i] == element) return true;
+    }
+
+    return false;
+}
+
