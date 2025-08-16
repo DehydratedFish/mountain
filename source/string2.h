@@ -103,6 +103,14 @@ inline String next_line(String str, s64 *offset) {
     return result;
 }
 
+inline s64 find_first(String str, u8 c) {
+    for (s64 i = 0; i < str.size; i += 1) {
+        if (str[i] == c) return i;
+    }
+
+    return -1;
+}
+
 inline s64 find_last(String str, u8 c) {
     for (s64 i = str.size; i > 0; i -= 1) {
         s64 index = i - 1;
@@ -170,13 +178,31 @@ inline String trim(String str) {
     return str;
 }
 
-inline String sub_string(String buffer, s64 offset, s64 size) {
+inline String sub_string(String str, s64 offset, s64 size) {
 #ifdef BOUNDS_CHECKING
-    if (buffer.size < offset + size) die("String read out of bounds.");
+    if (str.size < offset + size) die("String read out of bounds.");
 #endif
-    String result = {buffer.data + offset, size};
+    String result = {str.data + offset, size};
 
     return result;
+}
+
+inline String head_until(String str, s64 offset) {
+#ifdef BOUNDS_CHECKING
+        if (str.size < offset) die("String read out of bounds.");
+#endif
+        String result = {str.data, offset};
+
+        return result;
+}
+
+inline String tail_from(String str, s64 offset) {
+#ifdef BOUNDS_CHECKING
+        if (str.size < offset) die("String read out of bounds.");
+#endif
+        String result = {str.data + offset, str.size - offset};
+
+        return result;
 }
 
 inline void destroy(String *str, Allocator alloc = DefaultAllocator) {

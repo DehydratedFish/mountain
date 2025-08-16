@@ -71,7 +71,7 @@ void die(const char *msg);
 #define assert(expr) (void)((expr) || (fire_assert(#expr, __func__, __FILE__, __LINE__),0))
 
 #else
-#define assert(expr)
+#define assert(expr) (expr)
 
 #endif // DEVELOPER
 

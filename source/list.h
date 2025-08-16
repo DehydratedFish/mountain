@@ -190,5 +190,17 @@ void stable_remove(List<Type> *list, s64 index) {
     BOUNDS_CHECK(0, list->size - 1, index, "List remove out of bounds.");
 
     copy_memory(list->data + index, list->data + index + 1, (list->size - (index + 1)) * sizeof(Type));
+    list->size -= 1;
+}
+
+template<class Type>
+void stable_remove(List<Type> *list, s64 index, s64 elements) {
+    if (list->size == 0) return;
+
+    if (index < 0) index = list->size + index;
+    BOUNDS_CHECK(0, list->size, index + elements, "List remove out of bounds.");
+
+    copy_memory(list->data + index, list->data + index + elements, (list->size - (index + elements)) * sizeof(Type));
+    list->size -= elements;
 }
 

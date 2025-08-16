@@ -13,6 +13,9 @@ struct PlatformFileOptions {
 };
 struct PlatformFile {
     void *handle;
+
+    // TODO: Remove one and just have one buffer for read and write.
+    //       Add a flag to know what the last operation was.
     MemoryBuffer<u8> read_buffer;
     MemoryBuffer<u8> write_buffer;
 
@@ -44,12 +47,16 @@ PlatformFile platform_file_open(String filename, PlatformFileOptions options = P
 void   platform_file_close(PlatformFile *file);
 s64    platform_file_size(PlatformFile *file);
 b32    platform_file_exists(String file);
+String platform_read(PlatformFile *file, void *buffer, s64 size);
 String platform_read(PlatformFile *file, u64 offset, void *buffer, s64 size);
+String platform_read_line(PlatformFile *file);
 s64    platform_write(PlatformFile *file, void const *buffer, s64 size);
 s64    platform_write(PlatformFile *file, u64 offset, void const *buffer, s64 size);
+void   platform_fill_read_buffer(PlatformFile *file);
 b32    platform_flush_write_buffer(PlatformFile *file);
 
 // NOTE: Does also delete folders.
+b32  platform_change_current_folder(String path);
 b32  platform_delete_file(String path);
 void platform_delete_folder_content(String path);
 b32  platform_create_folder(String name);
@@ -59,8 +66,25 @@ b32  platform_rename_file(String from, String to);
 String platform_line_ending();
 
 
+struct PlatformFolder;
+PlatformFolder *platform_open_folder(String path, Allocator alloc = DefaultAllocator);
+void            platform_close_folder(PlatformFolder *folder);
+
+enum PlatformFolderItemKind {
+    PLATFORM_FILE,
+    PLATFORM_FOLDER,
+};
+struct PlatformFolderItem {
+    PlatformFolderItemKind kind;
+    String name;
+};
+
+PlatformFolderItem *platform_next_item(PlatformFolder *folder);
+
+
 struct PlatformTerminal {
     PlatformFile *out;
+    PlatformFile *in;
 };
 
 extern PlatformTerminal Console;
@@ -126,6 +150,13 @@ struct PlatformExecutionContext {
 };
 
 PlatformExecutionContext platform_execute(String command);
+
+enum {
+    PLATFORM_EXECUTE_OK,
+    PLATFORM_EXECUTE_FILE_NOT_FOUND,
+    PLATFORM_EXECUTE_GENERIC_ERROR,
+};
+s32 platform_execute_and_wait(String command, s32 *exit_code);
 
 String platform_current_folder(Allocator alloc = TempAllocator);
 String platform_config_folder(Allocator alloc = TempAllocator);

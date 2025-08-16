@@ -246,6 +246,7 @@ String convert_double_to_string(u8 *buffer, s32 size, r64 number, s32 precision 
 void convert_to_ptr_string(u8 *buffer, s32 buffer_size, void *address);
 
 s64 print(char const *fmt, ...);
+s64 print(String str);
 s64 format(struct StringBuilder *builder, char const *fmt, ...);
 s64 format(struct StringBuilder *builder, char const *fmt, va_list args);
 s64 format(struct PlatformFile *file, char const *fmt, ...);

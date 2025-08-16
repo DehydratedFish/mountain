@@ -452,6 +452,10 @@ s64 print(char const *fmt, ...) {
     return written;
 }
 
+s64 print(String str) {
+    return write(Console.out, str.data, str.size);
+}
+
 s64 format(struct PlatformFile *file, char const *fmt, ...) {
     va_list args;
     va_start(args, fmt);

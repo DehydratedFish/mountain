@@ -4,9 +4,11 @@
 #include "definitions.h"
 #include "arena.h"
 #include "list.h"
+#include "memory.h"
 #include "string2.h"
 #include "string_builder.h"
 #include "utf.h"
+#include "win32/win33.h"
 
 #include <cwchar>
 
@@ -65,12 +67,19 @@ INTERNAL b32 setup_raw_input() {
 }
 
 INTERNAL PlatformFile StandardOutHandle;
+INTERNAL PlatformFile StandardInHandle;
 INTERNAL b32 setup_terminal() {
     StandardOutHandle.handle = GetStdHandle(STD_OUTPUT_HANDLE);
     init_memory_buffer(&StandardOutHandle.write_buffer, PLATFORM_CONSOLE_BUFFER_SIZE);
     StandardOutHandle.open = true;
 
     Console.out = &StandardOutHandle;
+
+    StandardInHandle.handle = GetStdHandle(STD_INPUT_HANDLE);
+    init_memory_buffer(&StandardInHandle.read_buffer, PLATFORM_CONSOLE_BUFFER_SIZE);
+    StandardInHandle.open = true;
+
+    Console.in = &StandardInHandle;
 
     return true;
 }
@@ -206,9 +215,9 @@ INTERNAL b32 is_relative(String str) {
     return true;
 }
 
-INTERNAL WideString widen_path(String str, Allocator alloc = TempAllocator) {
-    WideString const prefix = L"\\\\?\\";
+INTERNAL WideString const PathPrefix = L"\\\\?\\";
 
+INTERNAL WideString widen_path(String str, Allocator alloc = TempAllocator) {
     s64 length = utf16_string_length(str);
     if (length == -1) return {};
 
@@ -217,29 +226,29 @@ INTERNAL WideString widen_path(String str, Allocator alloc = TempAllocator) {
 
 // NOTE: This is needed for paths to prepend \\?\ to it, else paths can only
 //       be MAX_PATH long. Using own function because there is no need for
-//       an additional allocations.
+//       an additional allocation.
     String16 path = {};
     if (is_relative(str)) {
         WideString tmp = widen(str);
         u32 full_length = GetFullPathNameW(tmp.data, 0, 0, 0);
 
-        total_size = prefix.size + full_length + 1;
+        total_size = PathPrefix.size + full_length + 1;
         data = ALLOC(alloc, u16, total_size);
 
-        path = {data + prefix.size, full_length};
-        copy_memory(data, prefix.data, prefix.size * sizeof(*prefix.data));
+        path = {data + PathPrefix.size, full_length};
+        copy_memory(data, PathPrefix.data, PathPrefix.size * sizeof(*PathPrefix.data));
 
         if (GetFullPathNameW(tmp.data, full_length + 1, (wchar_t*)path.data, 0) != full_length - 1) {
             return {};
         }
     } else {
-        total_size = prefix.size + length + 1;
+        total_size = PathPrefix.size + length + 1;
         data = ALLOC(alloc, u16, total_size);
 
-        path = {data + prefix.size, length};
-        copy_memory(data, prefix.data, prefix.size * sizeof(*prefix.data));
+        path = {data + PathPrefix.size, length};
+        copy_memory(data, PathPrefix.data, PathPrefix.size * sizeof(*PathPrefix.data));
         to_utf16(path, str);
-        data[total_size - 1] = '\0';
+        data[total_size - 1] = L'\0';
     }
 
     convert_slash_to_backslash(path);
@@ -247,6 +256,29 @@ INTERNAL WideString widen_path(String str, Allocator alloc = TempAllocator) {
     return {data, total_size};
 }
 
+INTERNAL WideString widen_path_for_search(String str, Allocator alloc = TempAllocator) {
+    s64 length = utf16_string_length(str);
+
+    s64 total_size = length + 1;
+    WideString end = {};
+    if (str.size > 0 && !ends_with(str, "/")) {
+        total_size += 2;
+        end = L"\\*";
+    } else {
+        total_size += 1;
+        end = L"*";
+    }
+
+    u16 *data = ALLOC(alloc, u16, total_size);
+
+    String16 path = {data, length};
+    to_utf16(path, str);
+    copy_memory(path.data + path.size, end.data, end.size * sizeof(*end.data));
+
+    data[total_size - 1] = L'\0';
+
+    return {data, total_size};
+}
 
 INTERNAL void convert_backslash_to_slash(wchar_t *buffer, s64 size) {
     for (s64 i = 0; i < size; i += 1) {
@@ -316,6 +348,15 @@ s64 platform_file_size(PlatformFile *file) {
     return size;
 }
 
+String platform_read(PlatformFile *file, void *buffer, s64 size) {
+    u32 bytes_read = 0;
+    if (!ReadFile(file->handle, buffer, (u32)size, &bytes_read, 0)) {
+        print("Read error: %d\n", GetLastError());
+    }
+
+    return {(u8*)buffer, bytes_read};
+}
+
 String platform_read(PlatformFile *file, u64 offset, void *buffer, s64 size) {
     // TODO: Split reads if they are bigger than 32bit.
     assert(size <= INT_MAX);
@@ -334,8 +375,63 @@ String platform_read(PlatformFile *file, u64 offset, void *buffer, s64 size) {
     return {(u8*)buffer, bytes_read};
 }
 
+struct FindNewLineResult {
+    s64 index;
+    s32 length;
+};
+INTERNAL FindNewLineResult find_new_line(MemoryBuffer<u8> *buffer) {
+    FindNewLineResult result = {-1, 1};
+    for (s64 i = 0; i < buffer->size; i += 1) {
+        u8 c = buffer->data[i];
+
+        if (c == '\r') {
+            result.index = i;
+
+            if (i < buffer->size && buffer->data[i + 1] == '\n') {
+                result.length += 1;
+            }
+
+            break;
+        } else if (c == '\n') {
+            result.index = i;
+            break;
+        }
+    }
+
+    return result;
+}
+
+String platform_read_line(PlatformFile *file) {
+    // TODO: Make things work without buffering.
+    assert(file->read_buffer.alloc > 0);
+
+    StringBuilder line = {};
+    DEFER(destroy(&line));
+
+    b32 keep_reading = true;
+    while (keep_reading) {
+        platform_fill_read_buffer(file);
+
+        FindNewLineResult new_line = find_new_line(&file->read_buffer);
+        if (new_line.index == -1) {
+            append_raw(&line, file->read_buffer.data, file->read_buffer.size);
+            file->read_buffer.size = 0;
+        } else {
+            append_raw(&line, file->read_buffer.data, new_line.index);
+
+            s32 space = file->read_buffer.size - new_line.index - new_line.length;
+            copy_memory(file->read_buffer.data, file->read_buffer.data + new_line.index + new_line.length, space);
+            file->read_buffer.size -= new_line.index + new_line.length;
+            keep_reading = false;
+        }
+    }
+
+    return to_allocated_string(&line);
+}
+
 s64 platform_write(PlatformFile *file, u64 offset, void const *buffer, s64 size) {
     // TODO: Split writes if they are bigger than 32bit.
+    //       Also use buffered writes.
     assert(size <= INT_MAX);
 
     if (!file->open) return 0;
@@ -352,6 +448,19 @@ s64 platform_write(PlatformFile *file, u64 offset, void const *buffer, s64 size)
 
 s64 platform_write(PlatformFile *file, void const *buffer, s64 size) {
     return platform_write(file, ULLONG_MAX, buffer, size);
+}
+
+void platform_fill_read_buffer(PlatformFile *file) {
+    MemoryBuffer<u8> *buffer = &file->read_buffer;
+
+    s32 space = buffer->alloc - buffer->size;
+    if (space > 0) {
+        u32 bytes_read = 0;
+        if (!ReadFile(file->handle, buffer->data + buffer->size, space, &bytes_read, 0)) {
+            print("Read error(fill_read_buffer): %d\n", GetLastError());
+        }
+        buffer->size += bytes_read;
+    }
 }
 
 b32 platform_flush_write_buffer(PlatformFile *file) {
@@ -413,6 +522,17 @@ INTERNAL void delete_folder_content(WideString path) {
     } while (FindNextFileW(handle, &data));
 
     FindClose(handle);
+}
+
+b32 platform_change_current_folder(String path) {
+    SCOPE_TEMP_STORAGE();
+
+    // TODO: Should be widen path for the \\?\ prefix, but somehow that
+    //       doesn't seem to work with relative paths like ..
+    //       I am too lazy to investigate now.
+    WideString wide_path = widen(path);
+
+    return SetCurrentDirectoryW(wide_path.data);
 }
 
 b32 platform_delete_file(String path) {
@@ -488,6 +608,67 @@ String platform_line_ending() {
     return "\r\n";
 }
 
+struct PlatformFolder {
+    void *handle;
+
+    b32 was_just_opened;
+    PlatformFolderItem item;
+
+    Allocator alloc;
+};
+PlatformFolder *platform_open_folder(String path, Allocator alloc) {
+    PlatformFolderItem item = {};
+
+    WideString wide_path = widen_path_for_search(path);
+    WIN32_FIND_DATAW find_data = {};
+    void *handle = FindFirstFileW(wide_path.data, &find_data);
+    if (handle != INVALID_HANDLE_VALUE) {
+        item.kind = find_data.file_attributes & FILE_ATTRIBUTE_DIRECTORY ? PLATFORM_FOLDER : PLATFORM_FILE;
+
+        String16 wide_name = {(u16*)find_data.file_name, (s64)wcslen(find_data.file_name)};
+        item.name  = to_utf8(alloc, wide_name);
+    } else {
+        return 0;
+    }
+
+    PlatformFolder *folder = ALLOC(alloc, PlatformFolder, 1);
+    folder->was_just_opened = true;
+    folder->handle = handle;
+    folder->item   = item;
+
+    return folder;
+}
+
+PlatformFolderItem *platform_next_item(PlatformFolder *folder) {
+    if (folder->handle != INVALID_HANDLE_VALUE) {
+        if (folder->was_just_opened) {
+            folder->was_just_opened = false;
+        } else {
+            WIN32_FIND_DATAW find_data = {};
+            if (!FindNextFileW(folder->handle, &find_data)) {
+                return 0;
+            }
+
+            destroy(&folder->item.name, folder->alloc);
+            folder->item.kind = find_data.file_attributes & FILE_ATTRIBUTE_DIRECTORY ? PLATFORM_FOLDER : PLATFORM_FILE;
+
+            String16 wide_name = {(u16*)find_data.file_name, (s64)wcslen(find_data.file_name)};
+            folder->item.name  = to_utf8(folder->alloc, wide_name);
+        }
+
+        return &folder->item;
+    }
+
+    return 0;
+}
+
+void platform_close_folder(PlatformFolder *folder) {
+    destroy(&folder->item.name, folder->alloc);
+
+    FindClose(folder->handle);
+    DEALLOC(folder->alloc, folder, 1);
+}
+
 
 PlatformReadResult platform_read_entire_file(String file, Allocator alloc) {
     SCOPE_TEMP_STORAGE();
@@ -541,7 +722,6 @@ b32 platform_file_exists(String file) {
 
     return PathFileExistsW(wide_file.data);
 }
-
 
 s64 platform_timestamp() {
     s64 counter;
@@ -807,7 +987,6 @@ PlatformExecutionContext platform_execute(String command) {
     info.std_output = write_pipe;
     info.flags     |= STARTF_USESTDHANDLES;
 
-    info.cb = sizeof(info);
     b32 status = CreateProcessW(0, (wchar_t*)wide_command.data, 0, 0, true, 0, 0, 0, &info, &process);
     if (!status) {
         log_error("ERROR: Running command %S with error code %d. ", command, GetLastError());
@@ -847,6 +1026,52 @@ PlatformExecutionContext platform_execute(String command) {
     return context;
 }
 
+s32 platform_execute_and_wait(String command, s32 *exit_code) {
+    SCOPE_TEMP_STORAGE();
+
+    *exit_code = 0;
+    // TODO: Converting slashes to backslashes?
+    WideString wide_command = widen(command);
+
+    PROCESS_INFORMATION process = {};
+    STARTUPINFOW info = {};
+    info.cb = sizeof(info);
+
+    b32 status = CreateProcessW(0, (wchar_t*)wide_command.data, 0, 0, true, 0, 0, 0, &info, &process);
+    if (!status) {
+        u32 error_code = GetLastError();
+        if (error_code == ERROR_FILE_NOT_FOUND) return PLATFORM_EXECUTE_FILE_NOT_FOUND;
+
+        // TODO: Return more descriptive error codes.
+        return PLATFORM_EXECUTE_GENERIC_ERROR;
+    }
+
+    WaitForSingleObject(process.process, INFINITE);
+    CloseHandle(process.process);
+    CloseHandle(process.thread);
+
+    u32 exit_result = 0;
+    GetExitCodeProcess(process.process, &exit_result);
+
+    // IMPORTANT: Overflow.
+    *exit_code = exit_result;
+
+    return PLATFORM_EXECUTE_OK;
+}
+
+
+INTERNAL b32 has_path_prefix(wchar_t const *path, u32 length) {
+    if (length >= 4) {
+        if (path[0] != L'\\') return false;
+        if (path[1] != L'\\') return false;
+        if (path[2] != L'?')  return false;
+        if (path[3] != L'\\') return false;
+
+        return true;
+    }
+
+    return false;
+}
 
 String platform_current_folder(Allocator alloc) {
     // NOTE: Can't scope TempAlloc here as the return can also be a temporary allocation.
@@ -858,6 +1083,10 @@ String platform_current_folder(Allocator alloc) {
 
     // TODO: Can this contain the \\?\ prefix?
     if (GetCurrentDirectoryW(length, buffer) != length - 1) return {};
+    if (has_path_prefix(buffer, length)) {
+        buffer += 4;
+        length -= 4;
+    }
     convert_backslash_to_slash(buffer, length - 1);
 
     String16 wide_string = {(u16*)buffer, length - 1};

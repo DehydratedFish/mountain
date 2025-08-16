@@ -152,6 +152,7 @@ WIN32_FUNC_DEF(void)      PostQuitMessage(int exit_code);
 WIN32_FUNC_DEF(sPtr)      DefWindowProcW(HWND wnd, u32 msg, uPtr w_param, sPtr l_param);
 WIN32_FUNC_DEF(u32)       GetLastError();
 WIN32_FUNC_DEF(u32)       GetCurrentDirectoryW(u32 buffer_length, wchar_t *buffer);
+WIN32_FUNC_DEF(b32)       SetCurrentDirectoryW(wchar_t const *path_name);
 WIN32_FUNC_DEF(u32)       GetFullPathNameW(wchar_t const *file_name, u32 buffer_length, wchar_t *buffer, wchar_t *file_part);
 
 // LoadCursor
@@ -176,9 +177,21 @@ struct WNDCLASSW {
 };
 WIN32_FUNC_DEF(u16) RegisterClassW(WNDCLASSW *wnd_class);
 
+struct COORD {
+    s16 x;
+    s16 y;
+};
+
 struct POINT {
     s32 x;
     s32 y;
+};
+
+struct SMALL_RECT {
+    s16 left;
+    s16 top;
+    s16 right;
+    s16 bottom;
 };
 
 struct RECT {
@@ -301,6 +314,20 @@ WIN32_FUNC_DEF(b32) CreatePipe(void **read_pipe, void **write_pipe, SECURITY_ATT
 
 u32 const HANDLE_FLAG_INHERIT = 0x00000001;
 WIN32_FUNC_DEF(b32) SetHandleInformation(void *object, u32 mask, u32 flags);
+
+u32 const ENABLE_LINE_INPUT = 0x0002;
+u32 const ENABLE_VIRTUAL_TERMINAL_INPUT = 0x0200;
+WIN32_FUNC_DEF(b32) GetConsoleMode(void *console_handle, u32 *mode);
+WIN32_FUNC_DEF(b32) SetConsoleMode(void *console_handle, u32 mode);
+
+struct CONSOLE_SCREEN_BUFFER_INFO {
+    COORD size;
+    COORD cursor_position;
+    u16   attributes;
+    SMALL_RECT window;
+    COORD maximum_window_size;
+};
+WIN32_FUNC_DEF(b32) GetConsoleScreenBufferInfo(void *console_output, CONSOLE_SCREEN_BUFFER_INFO *console_screen_buffer_info);
 
 struct PROCESS_INFORMATION {
   void *process;
