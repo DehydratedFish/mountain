@@ -360,6 +360,20 @@ s64 utf16_string_length(String string) {
     return length;
 }
 
+s64 utf16_string_length(String32 string) {
+    s64 result = 0;
+
+    for (s64 i = 0; i < string.size; i += 1) {
+        if (string.data[i] < 0x10000) {
+            result += 1;
+        } else {
+            result += 2;
+        }
+    }
+
+    return result;
+}
+
 UTFResult to_utf16(String16 buffer, String string) {
     UTF8Info info = utf8_info(string);
 
@@ -407,6 +421,30 @@ UTFResult to_utf16(String16 buffer, String string) {
     }
 
     return info.status;
+}
+
+UTFResult to_utf16(String16 buffer, String32 string) {
+    s64 buffer_pos = 0;
+    for (s64 i = 0; i < string.size; i += 1) {
+        if (string.data[i] < 0x10000) {
+            if (buffer_pos == buffer.size) return UTF_BUFFER_TOO_SHORT;
+
+            buffer.data[buffer_pos] = string.data[i];
+            buffer_pos += 1;
+        } else {
+            if (buffer_pos + 1 >= buffer.size) return UTF_BUFFER_TOO_SHORT;
+
+            u32 U = string.data[i] - 0x10000;
+            u16 high = 0xD800 + ((U >> 10) & 0x3FF);
+            u16 low  = 0xDC00 + U & 0x3FF;
+
+            buffer.data[buffer_pos]     = high;
+            buffer.data[buffer_pos + 1] = low;
+            buffer_pos += 2;
+        }
+    }
+
+    return UTF_OK;
 }
 
 String16 to_utf16(Allocator alloc, String string, b32 add_null_terminator) {

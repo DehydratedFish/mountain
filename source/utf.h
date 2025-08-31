@@ -58,7 +58,9 @@ UTF16Info utf16_info(u16 *string);
 UTF16Info utf16_info(String16 string);
 
 s64       utf16_string_length(String string);
+s64       utf16_string_length(String32 string);
 UTFResult to_utf16(String16 buffer, String string);
+UTFResult to_utf16(String16 buffer, String32 string);
 
 // NOTE: I don't like the last parameter, but added it for conversion inside the
 //       win32 platform layer. It should go away.
@@ -86,7 +88,7 @@ struct UTF8CharResult {
     u32 cp;
     u8  byte[4];
     s32 length;
-    u32 status;
+    s32 status;
 };
 UTF8CharResult utf8_peek(String str);
 

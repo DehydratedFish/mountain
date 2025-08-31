@@ -170,6 +170,19 @@ void pop(List<Type> *list) {
     list->size -= 1;
 }
 
+template<class Type>
+void move_to_front(List<Type> *list, s64 index) {
+    if (list->size < 2) return;
+
+    if (index < 0) index = list->size + index;
+    BOUNDS_CHECK(0, list->size - 1, index, "List remove out of bounds.");
+
+    Type tmp = list->data[index];
+    copy_memory(list->data + 1, list->data, index * sizeof(Type));
+
+    list->data[0] = tmp;
+}
+
 // NOTE: does not preserve order
 template<class Type>
 void remove(List<Type> *list, s64 index) {
@@ -202,5 +215,13 @@ void stable_remove(List<Type> *list, s64 index, s64 elements) {
 
     copy_memory(list->data + index, list->data + index + elements, (list->size - (index + elements)) * sizeof(Type));
     list->size -= elements;
+}
+
+template<class Type>
+void copy_array(List<Type> *list, Array<Type> array) {
+    ensure_space(list, array.size);
+
+    copy_memory(list->data, array.data, array.size * sizeof(Type));
+    list->size = array.size;
 }
 

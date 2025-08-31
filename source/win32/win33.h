@@ -315,10 +315,20 @@ WIN32_FUNC_DEF(b32) CreatePipe(void **read_pipe, void **write_pipe, SECURITY_ATT
 u32 const HANDLE_FLAG_INHERIT = 0x00000001;
 WIN32_FUNC_DEF(b32) SetHandleInformation(void *object, u32 mask, u32 flags);
 
-u32 const ENABLE_LINE_INPUT = 0x0002;
+WIN32_FUNC_DEF(b32) SetConsoleCP(u32 code_page_id);
+WIN32_FUNC_DEF(b32) SetConsoleOutputCP(u32 code_page_id);
+
+WIN32_FUNC_DEF(u32) GetConsoleCP();
+WIN32_FUNC_DEF(u32) GetConsoleOutputCP();
+
+u32 const ENABLE_PROCESSED_INPUT        = 0x0001;
+u32 const ENABLE_LINE_INPUT             = 0x0002;
 u32 const ENABLE_VIRTUAL_TERMINAL_INPUT = 0x0200;
 WIN32_FUNC_DEF(b32) GetConsoleMode(void *console_handle, u32 *mode);
 WIN32_FUNC_DEF(b32) SetConsoleMode(void *console_handle, u32 mode);
+
+WIN32_FUNC_DEF(b32) ReadConsoleW(void *console_handle, void *buffer, u32 number_of_chars_to_read, u32 *number_of_chars_read, void *input_control);
+WIN32_FUNC_DEF(b32) WriteConsoleW(void *console_handle, void const *buffer, u32 number_of_chars_to_write, u32 *number_of_chars_written, void *reserved);
 
 struct CONSOLE_SCREEN_BUFFER_INFO {
     COORD size;
