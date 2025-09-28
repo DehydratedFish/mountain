@@ -26,7 +26,7 @@ inline u64 basic_hash(String *str) {
 
 TEMPLATE_DEFINITION
 struct HashTable {
-    // TODO: Can hashes be something other than integers?
+    // NOTE: Hash value 0 is always an empty entry.
     static HashType const FirstValidHash = 1;
 
     // TODO: Put this outside the HashTable struct?

@@ -11,18 +11,18 @@ extern thread_local Allocator TempAllocator;
 // TODO: Making {} equal the DefaultAllocator does actually lead to unwanted allocations.
 //       If a stored Allocator is {} and we specify the default one for the new allocation
 //       the old one will be deallocated first. Which is not necessary.
-INTERNAL void *allocate(Allocator alloc, s64 bytes) {
+inline void *allocate(Allocator alloc, s64 bytes) {
     if (bytes == 0) return 0;
     if (alloc.allocate == 0) alloc = DefaultAllocator;
 
     return alloc.allocate(alloc.data, bytes, 0, 0);
 }
-INTERNAL void *reallocate(Allocator alloc, s64 bytes, void *old, s64 old_bytes) {
+inline void *reallocate(Allocator alloc, s64 bytes, void *old, s64 old_bytes) {
     if (alloc.allocate == 0) alloc = DefaultAllocator;
 
     return alloc.allocate(alloc.data, bytes, old, old_bytes);
 }
-INTERNAL void deallocate(Allocator alloc, void *ptr, s64 old_size) {
+inline void deallocate(Allocator alloc, void *ptr, s64 old_size) {
     if (!ptr) return;
     if (alloc.allocate == 0) alloc = DefaultAllocator;
 
