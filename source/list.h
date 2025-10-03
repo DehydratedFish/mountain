@@ -60,7 +60,7 @@ template<class Type>
 void init(List<Type> *list, Type *buffer, s64 size, Allocator alloc = DefaultAllocator) {
     prealloc(list, size, alloc);
 
-    copy_memory(list->memory, buffer, size * sizeof(Type));
+    copy_memory(list->data, buffer, size * sizeof(Type));
 }
 
 template<class Type>
@@ -82,7 +82,7 @@ void prealloc(List<Type> *list, s64 size, Allocator alloc = DefaultAllocator) {
 
 template<class Type>
 void shrink(List<Type> *list) {
-    list->memory = REALLOC(list->allocator, list->data, list->alloc, list->size);
+    list->data = REALLOC(list->allocator, list->data, list->alloc, list->size);
     list->alloc  = list->size;
 }
 
@@ -192,7 +192,7 @@ void remove(List<Type> *list, s64 index) {
     BOUNDS_CHECK(0, list->size - 1, index, "List remove out of bounds.");
 
     list->size -= 1;
-    list->data[index] = list->memory[list->size];
+    list->data[index] = list->data[list->size];
 }
 
 template<class Type>
