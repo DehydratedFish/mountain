@@ -302,10 +302,10 @@ PlatformExecutionContext platform_execute(String command) {
     u8 buffer[buffer_size];
 
     size_t bytes_read = 0;
-    while (bytes_read) {
+    do {
         bytes_read = fread(buffer, 1, buffer_size, fd);
         append(&builder, {buffer, (s64)bytes_read});
-    }
+    } while (bytes_read);
 
     int exit_code = pclose(fd);
     context.output    = to_allocated_string(&builder);
