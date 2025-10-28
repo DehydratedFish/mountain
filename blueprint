@@ -3,6 +3,7 @@ brick: core {
     
     sources: /"source", "io.cpp", "utf.cpp", "ui.cpp", "font.cpp", "config.cpp";
     sources(#win32): "source/win32/platform.cpp";
+    sources(#linux): "source/linux/platform.cpp";
 
     dependencies(#win32): "User32.lib", "Shell32.lib", "Gdi32.lib", "Ole32.lib";
 }
