@@ -350,6 +350,8 @@ int main(int argc, char **argv) {
 
     s32 status = application_main(args);
 
+    platform_flush_write_buffer(Console.out);
+
     return status;
 }
 
