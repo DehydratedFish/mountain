@@ -91,13 +91,16 @@ struct CString {
 };
 
 // TODO: Maybe use a thread local arena allocator or something like an array pool?
-INTERNAL CString alloc_c_string(String name) {
+INTERNAL CString alloc_c_string(String str, String optional = "") {
     CString result = {};
 
-    result.data = ALLOC(TempAllocator, char, name.size + 1);
-    result.size = name.size;
+    s64 size = str.size + optional.size;
 
-    copy_memory(result.data, name.data, name.size);
+    result.data = ALLOC(TempAllocator, char, size + 1);
+    result.size = size;
+
+    copy_memory(result.data, str.data, str.size);
+    copy_memory(result.data + str.size, optional.data, optional.size);
     result.data[result.size] = '\0';
 
     return result;
@@ -284,13 +287,13 @@ PlatformExecutionContext platform_execute(String command) {
 
     PlatformExecutionContext context = {};
 
-    CString c_command = alloc_c_string(command);
-    FILE *pipe = popen(c_command.data, "r");
-    if (pipe == 0) {
+    // TODO: Is this enough or should we do a proper redirect without shell stuff?
+    CString c_command = alloc_c_string(command, " 2>&1");
+    FILE *fd = popen(c_command.data, "r");
+    if (fd == 0) {
         context.error = true;
         return context;
     }
-    DEFER(pclose(pipe));
 
     StringBuilder builder = {};
     DEFER(destroy(&builder));
@@ -300,11 +303,11 @@ PlatformExecutionContext platform_execute(String command) {
 
     size_t bytes_read = 0;
     while (bytes_read) {
-        bytes_read = fread(buffer, 1, buffer_size, pipe);
+        bytes_read = fread(buffer, 1, buffer_size, fd);
         append(&builder, {buffer, (s64)bytes_read});
     }
 
-    int exit_code = pclose(pipe);
+    int exit_code = pclose(fd);
     context.output    = to_allocated_string(&builder);
     context.exit_code = exit_code;
 
