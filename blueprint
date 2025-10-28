@@ -6,6 +6,7 @@ brick: core {
     sources(#linux): "source/linux/platform.cpp";
 
     dependencies(#win32): "User32.lib", "Shell32.lib", "Gdi32.lib", "Ole32.lib";
+    dependencies(#linux): "-lstdc++", "-lm";
 }
 
 library: lib {
