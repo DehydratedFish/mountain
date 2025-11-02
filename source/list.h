@@ -225,3 +225,14 @@ void copy_array(List<Type> *list, Array<Type> array) {
     list->size = array.size;
 }
 
+template<class Type>
+Array<Type> create_array(List<Type> list, Allocator alloc = DefaultAllocator) {
+    Array<Type> result = {};
+    result.data = ALLOC(alloc, Type, list.size);
+    result.size = list.size;
+
+    copy_memory(result.data, list.data, list.size * sizeof(Type));
+
+    return result;
+}
+
