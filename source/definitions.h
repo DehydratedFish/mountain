@@ -43,7 +43,6 @@ typedef s8  b8;
 typedef s32 b32;
 
 
-// TODO: Maybe a bit overkill? But I like having the option to shorten the names.
 struct Dimension {
     union {
         struct {
@@ -61,6 +60,7 @@ struct Point {
     s32 x;
     s32 y;
 };
+
 
 
 void fire_assert(char const *msg, char const *func, char const *file, int line);
@@ -175,4 +175,10 @@ DeferGuardBase<Functor> make_defer_guard_base(Functor f) {return f;}
 
 #define DEFER(stuff) DEFER2(UNIQUE_NAME(DeferGuardUniqueName), stuff)
 #define DEFER2(name, stuff) auto name = make_defer_guard_base([&](){stuff;});
+
+
+struct MessageResult {
+    s32    error;
+    String message;
+};
 

@@ -10,8 +10,9 @@
 
 
 struct UI;
-
 struct UIHittest;
+struct Font;
+struct GPUTexture;
 
 struct UIVertex {
     V3  pos;
@@ -21,27 +22,6 @@ struct UIVertex {
 
 struct UIRect {
     s32 x, y, w, h;
-};
-
-struct UIGlyphInfo {
-    r32 u0, v0, u1, v1;
-    s32 x0, y0, x1, y1;
-
-    s32 advance;
-};
-
-typedef V2i  UITextMetricCallback(void *data, String text, r32 height);
-typedef void UIGlyphInfoCallback (void *data, UIGlyphInfo *glyph, u32 cp, r32 height);
-struct UIFont {
-    void *font_data;
-    UITextMetricCallback *text_metrics;
-    UIGlyphInfoCallback  *glyph_info;
-};
-
-struct UIFontStyle {
-    s32 id;
-    r32 height;
-    u32 fg;
 };
 
 enum UITextAlign {
@@ -61,9 +41,7 @@ struct UITask {
     s64 count;
 
     union {
-        struct {
-            s32 font_id;
-        } text;
+        GPUTexture *texture;
         struct {
             UIRect area;
         } clipping;
@@ -71,29 +49,26 @@ struct UITask {
 };
 
 
-enum UIRegionKind {
-    UI_REGION_NONE,
-    UI_REGION_CUSTOM,
-    UI_REGION_TEXT,
+struct UIFrameBuffer {
+    s64 frame_number;
+    Dimension frame_size;
+    MemoryArena storage; // TODO: Does this need to grow in size?
+
+    List<UIVertex> vertex_buffer;
+    List<UITask>   tasks; // NOTE: Needs to be doubled and copied from each window for ordering reasons.
+
+    u32 background;
 };
 
-struct UIUserRegion {
-    V2i old_widget_cursor;
-    V2i old_reset;
-    UIRect region;
-};
 
 struct UIWindow {
     void *id;
-    UIRect region;
 
     V2i widget_cursor;
     V2i reset;
     List<UITask> tasks;
     List<UIHittest> hittests;
-
-    UIRegionKind region_kind;
-    UIUserRegion user_region;
+    List<UIRect> regions;
 
     V2i next_widget_offset;
 };
@@ -114,47 +89,54 @@ struct UI {
     void *active;
     void *last_clicked;
 
-    MemoryArena per_frame_memory;
+    List<Font*>      fonts;
+    List<GPUTexture> font_textures;
 
     UIWindow  viewport;
     UIWindow *current_window;
     List<UIWindow> windows;
 
-    List<UIFont> fonts;
     List<UIRect> clip_stack;
 
-    UIFrameFunc *frame_func;
+    UIFrameFunc   *frame_func;
+    UIFrameBuffer *frame_buffer;
 
-    List<UIVertex> vertex_buffer;
+    s64 frame_counter;
 };
+
 
 inline r32 pt(r32 points) {
     r32 const factor = 1.0f / 0.75f;
     return points * factor;
 }
 
-void init(UI *ui, s64 memory, UIFrameFunc *initial_frame);
+UIFrameBuffer create_frame_buffer(s64 size);
 
-s32 add_font(UI *ui, UIFont font);
+void init(UI *ui, UIFrameFunc *initial_frame);
+void clear_background(UI *ui, u32 color);
 
-void do_frame(UI *ui, V2i window_size, UserInput *input);
+UIFontIndex add_font(UI *ui, Font *font);
 
-void text_line(UI *ui, s32 font, r32 height, String text, u32 color);
-s32  edit_line(UI *ui, UIFontStyle font, String text, s32 indent, s32 cursor);
+void do_frame(UI *ui, UIFrameBuffer *buffer, Dimension window_size, UserInput *input);
+
+void v_split(UI *ui, r32 *split);
+
+b32  begin_sub_window(UI *ui, UIRect region);
+void end_sub_window(UI *ui);
+
+b32 text_line_button(UI *ui, void *id, UIFontStyle font, String text);
+b32 text_line_button(UI *ui, void *id, String text);
+
+void image_view(UI *ui, GPUTexture *image, Dimension resize = {0, 0});
+
+
+// TODO: Make it possible to specify the renderer?
+void render_frame(UIFrameBuffer *frame_buffer);
+
+
 
 b32 button(UI *ui, String text, UITheme *custom_theme = 0);
 b32 button(UI *ui, void *id, String text, UITheme *custom_theme = 0);
 
-typedef b32 UICustomKeyCallback(KeyAction *key);
-b32  begin_custom_region(UI *ui, UIRect region, u32 background = 0);
-void end_custom_region(UI *ui);
-
-b32  begin_text_edit_region(UI *ui, UIRect region, UICustomKeyCallback *callback);
-void end_text_edit_region(UI *ui);
-s32  text_piece(UI *ui, String text, UIFontStyle style, u8 *cursor_pos = 0);
-b32  advance_text_line(UI *ui, s32 line_height);
-
-void offset_next_widget(UI *ui, V2i offset);
-void offset_widgets(UI *ui, V2i offset);
 s32  capture_scroll(UI *ui, void *id, UIRect region);
 

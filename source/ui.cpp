@@ -1,7 +1,41 @@
 #include "ui.h"
 
 #include "utf.h"
+#include "font.h"
+#include "renderer.h"
 
+
+
+INTERNAL s32 const DefaultPadding = 5;
+INTERNAL s32 const DefaultMargin  = 5;
+
+INTERNAL r32 DefaultFontHeight = pt(16.0f);
+INTERNAL u32 DefaultFontColor  = PACK_RGB(210, 210, 210);
+INTERNAL u32 DefaultFontColorHover = PACK_RGB(75, 25, 160);
+
+INTERNAL UIThemeCategory const DefaultTextTheme = {
+    0,
+    DefaultFontHeight,
+    DefaultFontColor,
+
+    DefaultFontColor,
+    DefaultFontColorHover,
+    DefaultFontColor,
+
+    DefaultPadding,
+    DefaultMargin,
+};
+
+INTERNAL UIThemeCategory const DefaultButtonTheme = {
+    DefaultTextTheme.font_style,
+
+    PACK_RGB(60, 60, 60),
+    PACK_RGB(80, 80, 80),
+    PACK_RGB(100, 100, 100),
+
+    DefaultPadding,
+    DefaultMargin,
+};
 
 
 INTERNAL UICursorTheme const DefaultCursor {
@@ -9,10 +43,26 @@ INTERNAL UICursorTheme const DefaultCursor {
     UI_CURSOR_BLOCK,
 };
 
+
+INTERNAL b32 TheThemeInitialized = false;
+INTERNAL UITheme TheTheme;
+
+// NOTE: Default font is always at index zero.
+// TODO: Make sure it is also loaded at all time.
+INTERNAL void init_default_theme() {
+    TheTheme.text = DefaultTextTheme;
+    TheTheme.button = DefaultButtonTheme;
+}
+
+
+INTERNAL Font DefaultFont;
+
+
 struct UIHittest {
     void *id;
     UIRect rect;
 };
+
 
 enum ButtonState {
     BUTTON_IDLE,
@@ -47,7 +97,7 @@ INTERNAL ButtonState click_info(UI *ui, void *id) {
 INTERNAL String duplicate(UI *ui, String str) {
     if (str.size == 0) return {};
 
-    u8 *tmp = (u8*)allocate_from_arena(&ui->per_frame_memory, str.size, 0, 0);
+    u8 *tmp = (u8*)allocate_from_arena(&ui->frame_buffer->storage, str.size, 0, 0);
     copy_memory(tmp, str.data, str.size);
     str.data = tmp;
 
@@ -56,14 +106,31 @@ INTERNAL String duplicate(UI *ui, String str) {
 
 INTERNAL void default_frame_func(UI *ui) {
 }
-INTERNAL r32 DefaultFontHeight = pt(16.0f);
-INTERNAL u32 DefaultFontColor  = PACK_RGB(210, 210, 210);
 
+UIFrameBuffer create_frame_buffer(s64 size) {
+    UIFrameBuffer frame_buffer = {};
+    init(&frame_buffer.storage, KILOBYTES(4));
 
-void init(UI *ui, s64 memory, UIFrameFunc *initial_frame) {
+    return frame_buffer;
+}
+
+void init(UI *ui, UIFrameFunc *initial_frame) {
+    if (!TheThemeInitialized) {
+        init_default_theme();
+    }
+
     UI new_ui = {};
     new_ui.current_window = &new_ui.viewport;
-    init(&new_ui.per_frame_memory, memory);
+    append(&new_ui.viewport.regions);
+
+    String liberation_font_file = "fonts/LiterationMonoNerdFontMono-Regular.ttf";
+    s32 const font_atlas_size = 2048;
+    if (!init(&DefaultFont, liberation_font_file, 64.0f, font_atlas_size)) {
+        print("Could not load font %S.\n", liberation_font_file);
+        die("Aborting application...");
+    }
+
+    add_font(&new_ui, &DefaultFont);
 
     if (initial_frame) {
         new_ui.frame_func = initial_frame;
@@ -74,11 +141,24 @@ void init(UI *ui, s64 memory, UIFrameFunc *initial_frame) {
     *ui = new_ui;
 }
 
-s32 add_font(UI *ui, UIFont font) {
-    s32 index = ui->fonts.size;
+void clear_background(UI *ui, u32 color) {
+    ui->frame_buffer->background = color;
+}
+
+UIFontIndex add_font(UI *ui, Font *font) {
+    UIFontIndex result = {(s32)ui->fonts.size};
     append(&ui->fonts, font);
 
-    return index;
+    GPUTexture *tex = append(&ui->font_textures);
+    upload_gpu_texture(tex, {font->atlas_size, font->atlas_size}, 1, font->atlas);
+
+    return result;
+}
+
+Font *font_from_index(UI *ui, UIFontIndex font) {
+    BOUNDS_CHECK(0, ui->fonts.size, font.index, "Font index out of bounds. Did you forget to load a font earlier?");
+
+    return ui->fonts[font.index];
 }
 
 INTERNAL b32 cursor_in_rect(UI *ui, UIRect rect) {
@@ -113,7 +193,7 @@ INTERNAL void *hovered_element(UI *ui) {
 INTERNAL UITask *create_new_task(UI *ui, UITaskKind kind) {
     UITask task = {};
     task.kind  = kind;
-    task.start = ui->vertex_buffer.size;
+    task.start = ui->frame_buffer->vertex_buffer.size;
     
     return append(&ui->current_window->tasks, task);
 }
@@ -123,7 +203,7 @@ INTERNAL UITask *create_new_task(UI *ui, UITaskKind kind) {
 INTERNAL UITask *create_new_task_before(UI *ui, UITaskKind kind) {
     UITask task = {};
     task.kind  = kind;
-    task.start = ui->vertex_buffer.size;
+    task.start = ui->frame_buffer->vertex_buffer.size;
     
     return insert(&ui->current_window->tasks, -1, task);
 }
@@ -138,7 +218,7 @@ INTERNAL void prepare_window(UIWindow *window) {
     window->tasks.size    = 0;
     window->hittests.size = 0;
 
-    window->widget_cursor = {0, 0};
+    window->widget_cursor = {window->regions[-1].x, window->regions[-1].y};
 }
 
 INTERNAL void push_clipping(UI *ui, UIRect rect) {
@@ -154,22 +234,27 @@ INTERNAL void pop_clipping(UI *ui) {
     if (ui->clip_stack.size > 0) {
         generate_clip_task(ui, ui->clip_stack[-1]);
     } else {
-        generate_clip_task(ui, ui->viewport.region);
+        generate_clip_task(ui, ui->viewport.regions[-1]);
     }
 }
 
-void do_frame(UI *ui, V2i window_size, UserInput *input) {
+void do_frame(UI *ui, UIFrameBuffer *buffer, Dimension window_size, UserInput *input) {
     assert(input);
+    assert(buffer);
     assert(ui->frame_func);
     assert(ui->clip_stack.size == 0);
     // TODO: Always load a default font.
     assert(ui->fonts.size > 0);
 
-    ui->viewport.region.w = window_size.w;
-    ui->viewport.region.h = window_size.h;
+    ui->viewport.regions[-1].w = window_size.w;
+    ui->viewport.regions[-1].h = window_size.h;
 
-    ui->per_frame_memory.used = 0;
-    ui->vertex_buffer.size = 0;
+    buffer->storage.used = 0;
+    buffer->vertex_buffer.size = 0;
+    buffer->tasks.size   = 0;
+    buffer->frame_number = ui->frame_counter;
+    buffer->frame_size   = window_size;
+    ui->frame_buffer = buffer;
 
     ui->input = input;
 
@@ -192,19 +277,39 @@ void do_frame(UI *ui, V2i window_size, UserInput *input) {
 
     ui->state = UI_STATE_IDLE;
     ui->input = 0;
+    ui->frame_counter += 1;
+
+    FOR (ui->windows, window) {
+        Array<UITask> tasks = window->tasks;
+        append(&ui->frame_buffer->tasks, tasks);
+    }
+
+    {
+        Array<UITask> tasks = ui->viewport.tasks;
+        append(&ui->frame_buffer->tasks, tasks);
+    }
+
+    for (s64 i = 0; i < ui->fonts.size; i += 1) {
+        Font *font = ui->fonts[i];
+        if (ui->fonts[i]->is_dirty) {
+            upload_gpu_texture(&ui->font_textures[i], {font->atlas_size, font->atlas_size}, 1, font->atlas);
+        }
+    }
+
+    assert(ui->viewport.regions.size == 1);
 }
 
 
 
-INTERNAL b32 size_from_layout(UI *ui, UIRect *rect) {
+INTERNAL b32 size_from_layout(UI *ui, UIRect *rect, s32 margin) {
     // TODO: Check if a layout is set or else just return false.
-    rect->x = ui->current_window->widget_cursor.x;
-    rect->y = ui->current_window->widget_cursor.y;
+    rect->x = ui->current_window->widget_cursor.x + margin;
+    rect->y = ui->current_window->widget_cursor.y + margin;
 
     return false;
 }
 
-INTERNAL b32 widget_sizing(UI *ui, UIRect *rect, UITheme const *theme = 0) {
+INTERNAL b32 widget_sizing(UI *ui, UIRect *rect, UIThemeCategory const *theme = 0) {
     UIWindow *window = ui->current_window;
     s32 margin = theme ? theme->margin : 0;
 
@@ -214,6 +319,13 @@ INTERNAL b32 widget_sizing(UI *ui, UIRect *rect, UITheme const *theme = 0) {
 
     // TODO: Calculate width and height from layout.
     return false;
+}
+
+INTERNAL void advance_widget_cursor(UI *ui, UIRect rect, s32 margin) {
+    UIWindow *window = ui->current_window;
+
+    window->widget_cursor.x  = window->regions[-1].x;
+    window->widget_cursor.y += margin + rect.h;
 }
 
 
@@ -227,7 +339,7 @@ INTERNAL void add_hittest(UI *ui, void *id, UIRect rect) {
 }
 
 INTERNAL void append(UI *ui, UITask *task, UIVertex vertex) {
-    append(&ui->vertex_buffer, vertex);
+    append(&ui->frame_buffer->vertex_buffer, vertex);
     task->count += 1;
 }
 
@@ -237,13 +349,13 @@ INTERNAL void draw_rect(UI *ui, UITask *task, UIRect rect, u32 color) {
     r32 x1 = x0 + rect.w;
     r32 y1 = y0 + rect.h;
 
-    append(ui, task, {{x0, y0}, {}, color});
-    append(ui, task, {{x1, y0}, {}, color});
-    append(ui, task, {{x0, y1}, {}, color});
+    append(ui, task, {{x0, y0}, {0.0f, 0.0f}, color});
+    append(ui, task, {{x1, y0}, {1.0f, 0.0f}, color});
+    append(ui, task, {{x0, y1}, {0.0f, 1.0f}, color});
                
-    append(ui, task, {{x0, y1}, {}, color});
-    append(ui, task, {{x1, y0}, {}, color});
-    append(ui, task, {{x1, y1}, {}, color});
+    append(ui, task, {{x0, y1}, {0.0f, 1.0f}, color});
+    append(ui, task, {{x1, y0}, {1.0f, 0.0f}, color});
+    append(ui, task, {{x1, y1}, {1.0f, 1.0f}, color});
 }
 
 INTERNAL void draw_rect(UI *ui, UIRect rect, u32 color) {
@@ -251,12 +363,13 @@ INTERNAL void draw_rect(UI *ui, UIRect rect, u32 color) {
     draw_rect(ui, task, rect, color);
 }
 
-INTERNAL void glyph_info(UIFont *font, UIGlyphInfo *info, u32 cp, r32 height) {
-    assert(font->glyph_info);
-    font->glyph_info(font->font_data, info, cp, height);
+INTERNAL void draw_rect(UI *ui, UIRect rect, GPUTexture *tex) {
+    UITask *task = create_new_task(ui, UI_TASK_GEOMETRY);
+    draw_rect(ui, task, rect, PACK_RGB(255, 255, 255));
+    task->texture = tex;
 }
 
-INTERNAL void draw_character(UI *ui, UITask *task, UIGlyphInfo *glyph, V2i pos, r32 height, u32 color) {
+INTERNAL void draw_character(UI *ui, UITask *task, GlyphInfo *glyph, V2i pos, r32 height, u32 color) {
     r32 x0 = (r32)(pos.x + glyph->x0);
     r32 y0 = (r32)(pos.y + glyph->y0);
     r32 x1 = (r32)(pos.x + glyph->x1);
@@ -271,38 +384,74 @@ INTERNAL void draw_character(UI *ui, UITask *task, UIGlyphInfo *glyph, V2i pos, 
     append(ui, task, {{x1, y1}, {glyph->u1, glyph->v1}, color});
 }
 
-INTERNAL V2i text_metrics(UIFont *font, String text, r32 height) {
-    assert(font->text_metrics);
-    return font->text_metrics(font->font_data, text, height);
-}
 
 // TODO: Additional selectable text function.
-INTERNAL void draw_text(UI *ui, s32 font_id, UIRect rect, r32 height, String text, u32 color, UITextAlign align = UI_TEXT_ALIGN_LEFT) {
+INTERNAL void draw_text(UI *ui, UIFontIndex font_index, UIRect rect, r32 height, String text, u32 color, UITextAlign align = UI_TEXT_ALIGN_LEFT) {
     UITask *task = create_new_task(ui, UI_TASK_TEXT);
 
-    UIFont *font = &ui->fonts[font_id];
+    Font *font = ui->fonts[font_index.index];
+    task->texture = &ui->font_textures[font_index.index];
 
     V2i cursor = {rect.x, rect.y};
     if (align == UI_TEXT_ALIGN_CENTER) {
-        V2i metrics = text_metrics(font, text, height);
+        FontDimensions metrics = text_dimensions(font, text, height);
+        Dimension m = {
+            (s32)ceil(metrics.width),
+            (s32)ceil(metrics.height)
+        };
 
-        s32 x_offset = (rect.x + (rect.w / 2)) - (metrics.w / 2);
-        s32 y_offset = (rect.y + (rect.h / 2)) - (metrics.h / 2);
+        s32 x_offset = (rect.x + (rect.w / 2)) - (m.w / 2);
+        s32 y_offset = (rect.y + (rect.h / 2)) - (m.h / 2);
 
         cursor.x = x_offset;
         cursor.y = y_offset;
     }
 
-    UIGlyphInfo glyph = {};
     for (auto it = make_utf8_it(text); it.valid; next(&it)) {
-        glyph_info(font, &glyph, it.cp, height);
+        GlyphInfo glyph = get_glyph(font, it.cp, height);
         draw_character(ui, task, &glyph, cursor, height, color);
 
-        cursor.x += glyph.advance;
+        cursor.x += (s32)glyph.advance;
     }
 }
 
-void text_line(UI *ui, s32 font, r32 height, String text, u32 color) {
+void v_split(UI *ui, r32 *split) {
+    assert(split);
+    void *id = split;
+
+    if (ui->state == UI_STATE_DRAW) {
+        UIWindow *window = ui->current_window;
+        UIRect rect = {(s32)(window->regions[-1].w * *split), window->regions[-1].y, 1, window->regions[-1].h};
+        // TODO: Put color into theme.
+        draw_rect(ui, rect, PACK_RGB(150, 150, 150));
+
+        rect.w += 3;
+        add_hittest(ui, id, rect);
+    } else if (ui->state == UI_STATE_INPUT) {
+        ButtonState state = click_info(ui, id);
+    }
+}
+
+
+b32 begin_sub_window(UI *ui, UIRect region) {
+    UIWindow *window = ui->current_window;
+    append(&window->regions, region);
+
+    window->widget_cursor = {region.x, region.y};
+
+    // TODO: Check if window is outside of bounds.
+    return true;
+}
+
+void end_sub_window(UI *ui) {
+    UIWindow *window = ui->current_window;
+    pop(&window->regions);
+
+    window->widget_cursor = {window->regions[-1].x, window->regions[-1].y};
+}
+
+
+void text_line(UI *ui, UIFontStyle style, String text) {
     if (ui->state == UI_STATE_DRAW) {
         UIRect rect = {
             ui->current_window->widget_cursor.x,
@@ -314,10 +463,77 @@ void text_line(UI *ui, s32 font, r32 height, String text, u32 color) {
 
         ui->current_window->next_widget_offset = {};
 
-        draw_text(ui, font, rect, height, text, color);
-        ui->current_window->widget_cursor.y += (s32)height;
+        draw_text(ui, style.font, rect, style.height, text, style.fg);
+        ui->current_window->widget_cursor.y += (s32)style.height;
     }
 }
+
+b32 text_line_button(UI *ui, void *id, UIFontStyle *font_style, String text) {
+    b32 clicked = false;
+
+    ButtonState state = click_info(ui, id);
+    if (ui->state == UI_STATE_DRAW) {
+        UIRect rect = {};
+        if (!size_from_layout(ui, &rect, 0)) {
+            // TODO: Size is calculated later in rendering again. Maybe cache it somehow?
+            Font *font = font_from_index(ui, font_style->font);
+            FontDimensions text_size = text_dimensions(font, text, font_style->height);
+            rect.w = (s32)ceil(text_size.width);
+            rect.h = (s32)ceil(text_size.height);
+        }
+
+        add_hittest(ui, id, rect);
+
+        advance_widget_cursor(ui, rect, 0);
+
+        UIFontStyle style = TheTheme.text.font_style;
+        if (state == BUTTON_HOVER) style.fg = TheTheme.text.hover;
+
+        draw_text(ui, style.font, rect, style.height, text, style.fg, UI_TEXT_ALIGN_CENTER);
+    } else if (ui->state == UI_STATE_INPUT) {
+        if (state == BUTTON_ACTIVATE) {
+            clicked = true;
+        }
+    }
+
+    return clicked;
+}
+
+b32 text_line_button(UI *ui, void *id, String text) {
+    return text_line_button(ui, id, &TheTheme.text.font_style, text);
+}
+
+
+
+void image_view(UI *ui, GPUTexture *image, Dimension resize) {
+    if (ui->state == UI_STATE_DRAW) {
+        UIRect rect = {};
+        if (!size_from_layout(ui, &rect, 0)) {
+            rect.w = image->size.w;
+            rect.h = image->size.h;
+
+            if (resize.w) {
+                if (resize.h == 0) {
+                    r32 aspect = (r32)rect.w / (r32)rect.h;
+                    rect.h = (s32)(resize.w / aspect);
+                } else {
+                    rect.h = resize.h;
+                }
+                rect.w = resize.w;
+            } else if (resize.h) {
+                r32 aspect = (r32)rect.w / (r32)rect.h;
+                rect.w = (s32)(resize.h * aspect);
+                rect.h = resize.h;
+            }
+        }
+
+        advance_widget_cursor(ui, rect, 0);
+
+        draw_rect(ui, rect, image);
+    }
+}
+
+
 
 s32 edit_line(UI *ui, UIFontStyle font, String text, s32 indent, s32 cursor) {
     if (ui->state == UI_STATE_DRAW) {
@@ -330,18 +546,7 @@ s32 edit_line(UI *ui, UIFontStyle font, String text, s32 indent, s32 cursor) {
     return -1;
 }
 
-INTERNAL UITheme const ButtonTheme = {
-    0,
-    DefaultFontHeight,
-    DefaultFontColor,
 
-    PACK_RGB(60, 60, 60),
-    PACK_RGB(80, 80, 80),
-    PACK_RGB(100, 100, 100),
-
-    10,
-    5,
-};
 
 b32 button(UI *ui, String text, UITheme *custom_theme) {
     return button(ui, text.data, text, custom_theme);
@@ -352,29 +557,26 @@ b32 button(UI *ui, void *id, String text, UITheme *custom_theme) {
 
     ButtonState state = click_info(ui, id);
     if (ui->state == UI_STATE_DRAW) {
-        UITheme const *theme = &ButtonTheme;
-        if (custom_theme) theme = custom_theme;
-
         UIRect rect = {};
-        if (!size_from_layout(ui, &rect)) {
+        if (!size_from_layout(ui, &rect, TheTheme.button.margin)) {
             // TODO: Size is calculated later in rendering again. Maybe cache it somehow?
-            UIFont *font = &ui->fonts[theme->font_id];
-            V2i text_size = font->text_metrics(font->font_data, text, theme->font_height);
-            rect.w = text_size.w + theme->padding;
-            rect.h = text_size.h + theme->padding;
+            Font *font = font_from_index(ui, TheTheme.button.font_style.font);
+            FontDimensions text_size = text_dimensions(font, text, TheTheme.button.font_style.height);
+            rect.w = (s32)ceil(text_size.width)  + TheTheme.button.padding;
+            rect.h = (s32)ceil(text_size.height) + TheTheme.button.padding;
         }
 
-        rect.x += theme->margin;
-        rect.y += theme->margin;
+        rect.x += TheTheme.button.margin;
+        rect.y += TheTheme.button.margin;
 
         add_hittest(ui, id, rect);
 
-        u32 color = theme->background;
-        if (state == BUTTON_HOVER) color   = theme->hover;
-        if (state == BUTTON_PRESSED) color = theme->pressed;
+        u32 color = TheTheme.button.background;
+        if (state == BUTTON_HOVER)   color = TheTheme.button.hover;
+        if (state == BUTTON_PRESSED) color = TheTheme.button.pressed;
         draw_rect(ui, rect, color);
 
-        draw_text(ui, theme->font_id, rect, theme->font_height, text, theme->font_color, UI_TEXT_ALIGN_CENTER);
+        draw_text(ui, TheTheme.button.font_style.font, rect, TheTheme.button.font_style.height, text, TheTheme.button.font_style.fg, UI_TEXT_ALIGN_CENTER);
     } else if (ui->state == UI_STATE_INPUT) {
         if (state == BUTTON_ACTIVATE) {
             clicked = true;
@@ -382,51 +584,6 @@ b32 button(UI *ui, void *id, String text, UITheme *custom_theme) {
     }
 
     return clicked;
-}
-
-b32 begin_custom_region(UI *ui, UIRect region, u32 background) {
-    b32 open = false;
-
-    UIWindow *window = ui->current_window;
-
-    // TODO: Maybe stack nested regions?
-    if (window->region_kind != UI_REGION_NONE) return open;
-
-    open = true;
-
-    window->region_kind = UI_REGION_CUSTOM;
-    window->user_region.old_widget_cursor = window->widget_cursor;
-
-    window->widget_cursor.x = region.x;
-    window->widget_cursor.y = region.y;
-
-    if (ui->state == UI_STATE_DRAW && background) {
-        draw_rect(ui, region, background);
-    }
-
-    return open;
-}
-
-void end_custom_region(UI *ui) {
-    ui->current_window->region_kind = UI_REGION_NONE;
-}
-
-void offset_next_widget(UI *ui, V2i offset) {
-    UIWindow *window = ui->current_window;
-    assert(window->region_kind != UI_REGION_NONE);
-
-    window->next_widget_offset = offset;
-}
-
-void offset_widgets(UI *ui, V2i offset) {
-    UIWindow *window = ui->current_window;
-    assert(window->region_kind != UI_REGION_NONE);
-
-    window->widget_cursor.x += offset.x;
-    window->widget_cursor.y += offset.y;
-
-    window->reset.x += offset.x;
-    window->reset.y += offset.y;
 }
 
 s32 capture_scroll(UI *ui, void *id, UIRect region) {
@@ -443,130 +600,61 @@ s32 capture_scroll(UI *ui, void *id, UIRect region) {
     return scroll;
 }
 
-b32 begin_text_edit_region(UI *ui, UIRect region, UICustomKeyCallback *callback) {
-    b32 open = false;
 
-    UIWindow *window = ui->current_window;
+INTERNAL Renderer UIRenderer;
+INTERNAL GPUBuffer UIVertexBuffer;
+INTERNAL GPUShader UITextShader;
+INTERNAL GPUShader UIShapeShader;
+INTERNAL b32 UIRendererInitialized;
+INTERNAL void init_ui_renderer() {
+    init_renderer(&UIRenderer);
+    set_shader_folder(&UIRenderer, "shader");
+    UITextShader  = load_gpu_shader(&UIRenderer, "ui_text");
+    UIShapeShader = load_gpu_shader(&UIRenderer, "ui_shape");
 
-    // TODO: Maybe stack nested regions?
-    if (window->region_kind != UI_REGION_NONE) return open;
+    VertexBinding bindings[] = {
+        {VERTEX_COMPONENT_V3, ShaderPositionLocation, (u32)STRUCT_OFFSET(UIVertex, pos)},
+        {VERTEX_COMPONENT_V2, ShaderUVLocation      , (u32)STRUCT_OFFSET(UIVertex, uv)},
+        {VERTEX_COMPONENT_PACKED_COLOR, ShaderForegroundColorLocation, (u32)STRUCT_OFFSET(UIVertex, color)},
+    };
+    create_gpu_buffer(&UIVertexBuffer, sizeof(UIVertex), 0, 0, {bindings, C_ARRAY_SIZE(bindings)});
 
-    open = true;
+    UIRendererInitialized = true;
+}
 
-    window->region_kind = UI_REGION_TEXT;
-    window->user_region.old_widget_cursor = window->widget_cursor;
-    window->user_region.old_reset = window->reset;
-    window->user_region.region = region;
+void render_frame(UIFrameBuffer *frame_buffer) {
+    if (!UIRendererInitialized) init_ui_renderer();
 
-    window->widget_cursor.x = region.x;
-    window->widget_cursor.y = region.y;
+    if (frame_buffer->background) {
+        clear_background(&UIRenderer, frame_buffer->background);
+    }
 
-    window->reset = window->widget_cursor;
+    update_render_area(&UIRenderer, frame_buffer->frame_size);
 
-    push_clipping(ui, region);
+    update_gpu_buffer(&UIVertexBuffer, frame_buffer->vertex_buffer.data, frame_buffer->vertex_buffer.size);
+    glBindVertexArray(UIVertexBuffer.vao);
+    glBindBuffer(GL_ARRAY_BUFFER, UIVertexBuffer.vbo);
+    glEnable(GL_SCISSOR_TEST);
 
-    if (ui->state == UI_STATE_INPUT && callback) {
-        for (s32 i = 0; i < ui->input->actions.used; i += 1) {
-            callback(&ui->input->actions.keys[i]);
+    FOR (frame_buffer->tasks, task) {
+        if (task->kind == UI_TASK_GEOMETRY) {
+            glUseProgram(UIShapeShader.id);
+            
+            if (task->texture) glBindTexture(GL_TEXTURE_2D, task->texture->id);
+            else               glBindTexture(GL_TEXTURE_2D, 0);
+
+            glDrawArrays(GL_TRIANGLES, task->start, task->count);
+        } else if (task->kind == UI_TASK_TEXT) {
+            glUseProgram(UITextShader.id);
+            glBindTexture(GL_TEXTURE_2D, task->texture->id);
+            glDrawArrays(GL_TRIANGLES, task->start, task->count);
+        } else if (task->kind == UI_TASK_CLIPPING) {
+            UIRect r = task->clipping.area;
+            r.y = (r.y + r.h) - frame_buffer->frame_size.h;
+            glScissor(r.x, r.y, r.w, r.h);
         }
     }
 
-    return open;
+    glDisable(GL_SCISSOR_TEST);
 }
 
-void end_text_edit_region(UI *ui) {
-    UIWindow *window = ui->current_window;
-    assert(window->region_kind == UI_REGION_TEXT);
-
-    window->region_kind   = UI_REGION_NONE;
-    window->widget_cursor = window->user_region.old_widget_cursor;
-    window->reset         = window->user_region.old_reset;
-
-    pop_clipping(ui);
-}
-
-s32 text_piece(UI *ui, String text, UIFontStyle style, u8 *cursor_pos) {
-    s32 hovered_character = -1;
-
-    // TODO: The hover calculation should actually happen in the input state.
-    //       But that means the string would be processed twice per frame
-    //       and I think that is unnecesarry.
-    if (ui->state == UI_STATE_DRAW) {
-        UITask *task = create_new_task(ui, UI_TASK_TEXT);
-
-        UIFont *font = &ui->fonts[style.id];
-
-        UIRect rect = {};
-        widget_sizing(ui, &rect);
-        V2i cursor = {rect.x, rect.y};
-
-        Point pointer = ui->input->mouse.cursor_pos;
-
-        b32 draw_cursor = false;
-        V2i cursor_bg   = {};
-        s32 cursor_width = 0;
-
-        s32 i = 0;
-        UIGlyphInfo glyph = {};
-        for (auto it = make_utf8_it(text); it.valid; next(&it)) {
-            glyph_info(font, &glyph, it.cp, style.height);
-
-            if (&text[it.index] == cursor_pos) {
-                draw_cursor = true;
-                cursor_bg   = cursor;
-                cursor_width = glyph.advance;
-                draw_character(ui, task, &glyph, cursor, style.height, PACK_RGB(15, 15, 15));
-            } else {
-                draw_character(ui, task, &glyph, cursor, style.height, style.fg);
-            }
-
-            s32 new_x = cursor.x + glyph.advance;
-            if (cursor.x < pointer.x && new_x >= pointer.x) {
-                hovered_character = i;
-            }
-
-            cursor.x = new_x;
-            i += 1;
-        }
-
-        if (end(text) == cursor_pos) {
-            glyph_info(font, &glyph, ' ', style.height);
-            draw_cursor = true;
-            cursor_bg   = cursor;
-            cursor_width = glyph.advance;
-        }
-
-        if (draw_cursor) {
-            UIRect  cursor_quad = {cursor_bg.x, cursor_bg.y, cursor_width, (s32)style.height};
-            UITask *cursor_task = create_new_task_before(ui, UI_TASK_GEOMETRY);
-
-            u32 color = DefaultCursor.color;
-            if (color == 0) color = style.fg;
-            draw_rect(ui, cursor_task, cursor_quad, color);
-        }
-
-        if (pointer.y < cursor.y || pointer.y >= (cursor.y + style.height)) {
-            hovered_character = -1;
-        }
-
-        ui->current_window->widget_cursor.x = cursor.x;
-    }
-
-    return hovered_character;
-}
-
-b32 advance_text_line(UI *ui, s32 line_height) {
-    b32 keep_advancing = false;
-
-    UIWindow *window = ui->current_window;
-    if (window->region_kind != UI_REGION_TEXT) return keep_advancing;
-
-    s32 region_end = window->user_region.region.y + window->user_region.region.h;
-    if (window->widget_cursor.y < region_end) {
-        window->widget_cursor.y += line_height;
-        window->widget_cursor.x  = window->reset.x;
-        keep_advancing = true;
-    }
-
-    return keep_advancing;
-}

@@ -77,6 +77,7 @@ enum PlatformFolderItemKind {
 struct PlatformFolderItem {
     PlatformFolderItemKind kind;
     String name;
+    u64    time;
 };
 
 PlatformFolderItem *platform_next_item(PlatformFolder *folder);
@@ -112,10 +113,6 @@ void                    platform_close_dynamic_library(PlatformDynamicLibrary *l
 void *platform_load_function(PlatformDynamicLibrary *lib);
 
 
-// TODO: Make it possible to specify if the update should wait for messages
-//       and/or signals.
-void platform_update();
-
 struct PlatformWindow;
 PlatformWindow *platform_create_window();
 void            platform_delete_window(PlatformWindow *window);
@@ -128,10 +125,11 @@ Dimension platform_size(PlatformWindow *window);
 
 
 enum PlatformUpdateFlags {
-    PLATFORM_UPDATE_WINDOW_SIZE    = 0x01,
-    PLATFORM_UPDATE_TIME           = 0x02,
-    PLATFORM_UPDATE_KEYBOARD_INPUT = 0x04,
-    PLATFORM_UPDATE_MOUSE_INPUT    = 0x08,
+    PLATFORM_UPDATE_WAIT_FOR_INPUT = 0x01,
+    PLATFORM_UPDATE_WINDOW_SIZE    = 0x02,
+    PLATFORM_UPDATE_TIME           = 0x04,
+    PLATFORM_UPDATE_KEYBOARD_INPUT = 0x08,
+    PLATFORM_UPDATE_MOUSE_INPUT    = 0x10,
 };
 struct PlatformUpdateInfo {
     b32 window_size_changed;
@@ -141,6 +139,7 @@ struct PlatformUpdateInfo {
 
     r32 dt_in_seconds;
 };
+void platform_update(u32 flags = 0);
 void platform_window_updates(PlatformWindow *window, PlatformUpdateInfo *info, u32 flags);
 
 struct PlatformExecutionContext {
@@ -175,7 +174,9 @@ void                   platform_opengl_delete_context(PlatformOpenGLContext *con
 // TODO: Should the name be just a c-string?
 //       As a regular String it needs to be copied first because of the missing 0 terminator.
 typedef void*(PlatformGLLoaderFunc)(PlatformOpenGLContext *context, String name);
-PlatformGLLoaderFunc *platform_gl_loader();
+PlatformGLLoaderFunc *platform_opengl_loader();
+
+MessageResult platform_opengl_load_functions(PlatformOpenGLContext *context);
 
 #endif // #ifdef PLATFORM_OPENGL_INTEGRATION
 

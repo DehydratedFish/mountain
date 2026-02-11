@@ -187,6 +187,8 @@ typedef s64 GLintptr;
 #define GL_COLOR_ATTACHMENT30 0x8CFE
 #define GL_COLOR_ATTACHMENT31 0x8CFF
 
+#define GL_UNPACK_ALIGNMENT   0x0CF5
+
 #define GL_INVALID_INDEX    0xFFFFFFFF
 
 
@@ -252,6 +254,8 @@ OPENGL_FUNC(void,   glBindFramebuffer, GLenum, GLuint);
 OPENGL_FUNC(void,   glFramebufferTexture, GLenum, GLenum, GLuint, GLint);
 OPENGL_FUNC(void,   glDrawBuffer, GLenum);
 OPENGL_FUNC(void,   glDrawBuffers, GLenum n, GLenum const*);
+
+OPENGL_FUNC(void,   glPixelStorei, GLenum, GLint);
 
 #undef OPENGL_FUNC
 

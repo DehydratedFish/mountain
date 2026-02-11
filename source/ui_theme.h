@@ -15,10 +15,18 @@ struct UICursorTheme {
     u32 shape;
 };
 
-struct UITheme {
-    s32 font_id;
-    r32 font_height;
-    u32 font_color;
+struct UIFontIndex {
+    s32 index;
+};
+
+struct UIFontStyle {
+    UIFontIndex font;
+    r32 height;
+    u32 fg;
+};
+
+struct UIThemeCategory {
+    UIFontStyle font_style;
 
     u32 background;
     u32 hover;
@@ -28,4 +36,8 @@ struct UITheme {
     s32 margin;
 };
 
+struct UITheme {
+    UIThemeCategory text;
+    UIThemeCategory button;
+};
 

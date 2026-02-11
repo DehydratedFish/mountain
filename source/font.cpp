@@ -185,7 +185,7 @@ FontDimensions text_dimensions(Font *font, String text, r32 height, b32 floor_ad
 
     for (auto it = make_utf8_it(text); it.valid; next(&it)) {
         CachedGlyph *glyph = find(&font->glyphs, it.cp);
-        if (glyph) glyph = load_glyph(font, it.cp);
+        if (!glyph) glyph = load_glyph(font, it.cp);
 
         r32 advance = glyph->advance * factor;
         if (floor_advance) advance = floor(advance);

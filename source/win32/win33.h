@@ -99,6 +99,14 @@ u32 const S_OK = 0x00000000;
 
 typedef sPtr (CALLBACK *WNDPROC)(HWND window, u32 msg, uPtr w_param, sPtr l_param);
 
+union ULARGE_INTEGER {
+    struct {
+        u32 low_part;
+        u32 high_part;
+    };
+    u64 quad_part;
+};
+
 struct OVERLAPPED {
     uPtr internal;
     uPtr internal_high;
@@ -238,6 +246,8 @@ struct MSG {
     Point pt;
     u32   private_;
 };
+WIN32_FUNC_DEF(b32) WaitMessage();
+WIN32_FUNC_DEF(b32) GetMessage(MSG *msg, HWND wnd, u32 msg_filter_min, u32 msg_filer_max);
 WIN32_FUNC_DEF(b32) PeekMessageW(MSG *msg, HWND wnd, u32 msg_filter_min, u32 msg_filter_max, u32 remove_msg);
 WIN32_FUNC_DEF(b32) TranslateMessage(MSG const *msg);
 WIN32_FUNC_DEF(s32) DispatchMessageW(MSG const *msg);

@@ -217,5 +217,33 @@ PlatformGLLoaderFunc *platform_gl_loader() {
     return public_function_loader;
 }
 
+
+// NOTE: This header is user specified. I would like it to be able for
+//       applications to only load the OpenGL pointers they need. As this reduces
+//       startup time a lot. Often you only need maybe 30 or so functions and loading
+//       the entire OpenGL Spec for 4.6 with all extensions is just taking quite long.
+// TODO: Better naming and option to specify the location of the header or if none
+//       is specified use a default one.
+#include "opengl_functions.h"
+
+// NOTE: Declare the function pointer variables.
+#define LOAD_OPENGL_FUNC(name) name##_proc *name;
+OPENGL_FUNCTIONS_TO_LOAD
+#undef LOAD_OPENGL_FUNC
+
+// NOTE: Load the specified functions.
+#define LOAD_OPENGL_FUNC(name) name = (decltype(name))loader(context, #name); if (name == 0) return { true, #name };
+MessageResult platform_opengl_load_functions(PlatformOpenGLContext *context) {
+    auto loader = platform_gl_loader();
+
+    OPENGL_FUNCTIONS_TO_LOAD
+
+    return {
+        false,
+        {}
+    };
+}
+#undef LOAD_OPENGL_FUNC
+
 #endif // #ifdef PLATFORM_OPENGL_INTEGRATION
 

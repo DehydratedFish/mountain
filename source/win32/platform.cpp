@@ -654,6 +654,13 @@ PlatformFolderItem *platform_next_item(PlatformFolder *folder) {
 
             String16 wide_name = {(u16*)find_data.file_name, (s64)wcslen(find_data.file_name)};
             folder->item.name  = to_utf8(folder->alloc, wide_name);
+
+            // NOTE: This is needed for alignment stuff. FILETIMEs can't be put directly
+            //       into u64s because they could be 4 byte aligned.
+            ULARGE_INTEGER tmp = {};
+            tmp.low_part  = find_data.last_write_time.low_date_time;
+            tmp.high_part = find_data.last_write_time.high_date_time;
+            folder->item.time = tmp.quad_part;
         }
 
         return &folder->item;
@@ -823,8 +830,13 @@ void *platform_load_function(PlatformDynamicLibrary *lib, String name) {
 
 INTERNAL s64 LastTime;
 INTERNAL s64 TimeSinceLastUpdate;
-void platform_update() {
+void platform_update(u32 flags) {
     MSG msg;
+
+    if (flags & PLATFORM_UPDATE_WAIT_FOR_INPUT) {
+        // TODO: Check return?
+        WaitMessage();
+    }
 
     while (PeekMessageW(&msg, 0, 0, 0, PM_REMOVE)) {
         TranslateMessage(&msg);
