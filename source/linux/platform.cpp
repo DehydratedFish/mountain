@@ -79,7 +79,7 @@ void die(char const *msg) {
     print("Fatal Error: %s\n\n", msg);
     print_stack_trace();
 
-    // TODO: This should work like a breakpoint. Needs testing.
+    // TODO: This should work like a breakpoint but I am not entirely sure.
     __builtin_trap();
     exit(-1);
 }
